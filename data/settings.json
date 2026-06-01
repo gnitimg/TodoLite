@@ -1,0 +1,9 @@
+{
+  "fontFamily": "system",
+  "fontSize": 14,
+  "glassOpacity": 0.34,
+  "blurStrength": 28,
+  "cornerRadius": 28,
+  "animation": true,
+  "windowLevel": "desktop"
+}

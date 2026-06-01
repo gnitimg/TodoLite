@@ -1,0 +1,53 @@
+.widget {
+  width: 100vw;
+  height: 100vh;
+  padding: 18px;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+header { display: flex; align-items: baseline; justify-content: space-between; padding: 2px 4px 12px; }
+.title { font-weight: 650; letter-spacing: -.02em; }
+.hint { font-size: 12px; color: var(--muted); }
+.list { overflow: hidden; padding-right: 2px; }
+.todo {
+  border-radius: 18px;
+  padding: 10px 10px;
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  gap: 8px;
+  align-items: start;
+  transition: transform .18s ease, background .18s ease, opacity .22s ease;
+}
+.todo:hover { background: rgba(255,255,255,.22); }
+.todo.done-fade { opacity: 0; transform: scale(.985) translateY(4px); }
+.check {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255,255,255,.25);
+  border: 1px solid rgba(0,0,0,.12);
+  cursor: pointer;
+}
+.check::after { content: ''; width: 8px; height: 4px; border-left: 2px solid transparent; border-bottom: 2px solid transparent; transform: rotate(-45deg); }
+.check:hover::after { border-color: rgba(20,20,24,.5); }
+.content { min-width: 0; cursor: pointer; }
+.content-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.25; }
+.detail { max-height: 0; overflow: hidden; color: var(--muted); font-size: 12px; line-height: 1.45; transition: max-height .22s ease, margin .22s ease; }
+.todo.open .detail { max-height: 120px; margin-top: 7px; }
+.ddl { font-size: 11px; color: var(--muted); white-space: nowrap; padding-top: 1px; }
+footer { display: flex; justify-content: flex-end; gap: 8px; padding-top: 12px; }
+footer button { width: 34px; height: 34px; font-size: 17px; }
+.empty { color: var(--muted); padding: 36px 4px; text-align: center; font-size: 13px; }
+dialog {
+  width: 360px;
+  border: 0;
+  padding: 16px;
+  color: var(--text);
+}
+dialog::backdrop { background: rgba(0,0,0,.08); backdrop-filter: blur(3px); }
+form { display: grid; gap: 10px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.dialog-actions button { padding: 8px 14px; }

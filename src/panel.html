@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="shared.css" />
+  <link rel="stylesheet" href="panel.css" />
+</head>
+<body>
+  <main class="panel glass">
+    <aside class="side drag">
+      <div class="brand">TodoLite</div>
+      <button class="nav active no-drag" data-page="tasks">Tasks</button>
+      <button class="nav no-drag" data-page="settings">Settings</button>
+      <div class="spacer"></div>
+      <button id="closeBtn" class="ghost no-drag">hide</button>
+    </aside>
+    <section class="page no-drag" id="tasksPage">
+      <div class="topbar drag">
+        <div>
+          <h1>Tasks</h1>
+          <p>visible, exact, retained</p>
+        </div>
+        <button id="newBtn" class="primary no-drag">＋</button>
+      </div>
+      <div id="activeList" class="block"></div>
+      <div id="completedList" class="block completed-block"></div>
+    </section>
+    <section class="page no-drag hidden" id="settingsPage">
+      <div class="topbar drag"><div><h1>Settings</h1><p>only what changes the layer</p></div></div>
+      <div class="settings-grid">
+        <label>Font<select id="fontFamily"></select></label>
+        <label>Font size<input id="fontSize" type="range" min="11" max="20" step="1"></label>
+        <label>Opacity<input id="glassOpacity" type="range" min="0.18" max="0.72" step="0.01"></label>
+        <label>Blur<input id="blurStrength" type="range" min="8" max="42" step="1"></label>
+        <label>Radius<input id="cornerRadius" type="range" min="14" max="36" step="1"></label>
+        <label>Layer<select id="windowLevel"><option value="desktop">desktop</option><option value="normal">normal</option><option value="topmost">topmost</option></select></label>
+      </div>
+      <div class="data-actions">
+        <button id="openData">open data</button>
+        <button id="openBackups">open backups</button>
+      </div>
+    </section>
+  </main>
+  <dialog id="editor" class="glass no-drag">
+    <form method="dialog" id="form">
+      <input id="content" placeholder="content" autocomplete="off" />
+      <input id="ddl" type="datetime-local" step="1" />
+      <textarea id="detail" placeholder="detail, optional"></textarea>
+      <div class="dialog-actions">
+        <button value="cancel" type="button" id="deleteBtn" class="danger">remove</button>
+        <div class="grow"></div>
+        <button value="cancel" type="button" id="cancelBtn">cancel</button>
+        <button value="ok" type="submit">save</button>
+      </div>
+    </form>
+  </dialog>
+  <script src="panel.js"></script>
+</body>
+</html>

@@ -1,0 +1,74 @@
+:root {
+  --opacity: .34;
+  --blur: 28px;
+  --radius: 28px;
+  --font-size: 14px;
+  --font-family: Inter, 'Segoe UI', system-ui, sans-serif;
+  --text: rgba(18, 20, 24, .92);
+  --muted: rgba(18, 20, 24, .54);
+  --line: rgba(255, 255, 255, .42);
+  --glass: rgba(255, 255, 255, var(--opacity));
+}
+
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; }
+body {
+  font-family: var(--font-family);
+  font-size: var(--font-size);
+  color: var(--text);
+  user-select: none;
+}
+
+.glass {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 14% 0%, rgba(255,255,255,.72), transparent 26%),
+    linear-gradient(135deg, rgba(255,255,255,.56), rgba(255,255,255,.16)),
+    var(--glass);
+  backdrop-filter: blur(var(--blur)) saturate(168%);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(168%);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow:
+    0 28px 72px rgba(0, 0, 0, .18),
+    inset 0 1px 0 rgba(255,255,255,.56),
+    inset 0 -1px 0 rgba(255,255,255,.12);
+}
+
+.glass::after {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: .065;
+  background-image: radial-gradient(rgba(255,255,255,.9) 1px, transparent 1px);
+  background-size: 4px 4px;
+}
+
+.drag { -webkit-app-region: drag; }
+.no-drag, button, input, textarea, select { -webkit-app-region: no-drag; }
+button, input, textarea, select {
+  font: inherit;
+  color: inherit;
+  border: none;
+  outline: none;
+}
+button {
+  cursor: pointer;
+  background: rgba(255,255,255,.28);
+  border: 1px solid rgba(255,255,255,.36);
+  border-radius: 999px;
+  transition: transform .18s ease, background .18s ease, opacity .18s ease;
+}
+button:hover { transform: translateY(-1px); background: rgba(255,255,255,.42); }
+button:active { transform: translateY(0) scale(.98); }
+input, textarea, select {
+  width: 100%;
+  background: rgba(255,255,255,.28);
+  border: 1px solid rgba(255,255,255,.34);
+  border-radius: 16px;
+  padding: 10px 12px;
+}
+textarea { min-height: 84px; resize: vertical; }
+.muted { color: var(--muted); }
