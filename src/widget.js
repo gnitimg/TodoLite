@@ -90,7 +90,18 @@ document.getElementById('sortBtn').onclick = () => { sortByDdl = !sortByDdl; ren
 window.todoLite.onTodosChanged(data => { todos = data; render(); });
 window.todoLite.onSettingsChanged(data => applySettings(data));
 
+function injectProjectFonts(list) {
+  if (!list.length) return;
+  const style = document.createElement('style');
+  style.textContent = list.map(f =>
+    `@font-face{font-family:'${f.name}';src:url('${f.url}');font-display:swap;}`
+  ).join('\n');
+  document.head.appendChild(style);
+}
+
 (async function init() {
+  const fonts = await window.todoLite.listFonts();
+  injectProjectFonts(fonts.project || []);
   todos = await window.todoLite.getTodos();
   settings = await window.todoLite.getSettings();
   applySettings(settings);
