@@ -25,12 +25,30 @@ function fromLocalInput(value) {
   return v;
 }
 
-function setGlassVar(target, name, value) {
-  if (target) {
-    target.style.setProperty(name, value);
-  } else {
-    document.documentElement.style.setProperty(name, value);
-  }
+function setCssVar(target, name, value) {
+  document.documentElement.style.setProperty(name, value);
+  if (target) target.style.setProperty(name, value);
+}
+
+function applyGlobalSettings(global) {
+  const g = global || {};
+
+  const family = g.fontFamily && g.fontFamily !== 'system'
+    ? `'${g.fontFamily}', 'Segoe UI', system-ui, sans-serif`
+    : `Inter, 'Segoe UI', system-ui, sans-serif`;
+
+  document.documentElement.lang = g.language || 'zh-CN';
+  document.documentElement.style.setProperty('--font-family', family);
+  document.documentElement.style.setProperty('--font-size', `${g.fontSize || 14}px`);
+
+  document.body.style.fontFamily = family;
+  document.body.style.fontSize = `${g.fontSize || 14}px`;
+}
+
+function applyWidgetGlass(ws) {
+  setCssVar(widget, '--opacity', String(ws.glassOpacity ?? .14));
+  setCssVar(widget, '--blur', `${ws.blurStrength ?? 36}px`);
+  setCssVar(widget, '--radius', `${ws.cornerRadius ?? 24}px`);
 }
 
 function applySettings(s) {
@@ -39,19 +57,8 @@ function applySettings(s) {
   const ws = settings.widget || {};
   sortByDdl = !!ws.sortByDdl;
 
-  setGlassVar(widget, '--font-size', `${ws.fontSize || 14}px`);
-  setGlassVar(widget, '--opacity', ws.glassOpacity ?? .14);
-  setGlassVar(widget, '--blur', `${ws.blurStrength || 36}px`);
-  setGlassVar(widget, '--radius', `${ws.cornerRadius || 24}px`);
-
-  setGlassVar(
-    widget,
-    '--font-family',
-    ws.fontFamily && ws.fontFamily !== 'system'
-      ? `'${ws.fontFamily}', 'Segoe UI', system-ui, sans-serif`
-      : `Inter, 'Segoe UI', system-ui, sans-serif`
-  );
-
+  applyGlobalSettings(settings.global || {});
+  applyWidgetGlass(ws);
   updateSortButton();
 }
 

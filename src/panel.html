@@ -11,13 +11,17 @@
       <div class="traffic-lights no-drag">
         <button class="tl-btn tl-close" id="tlClose" title="close"></button>
         <button class="tl-btn tl-min" id="tlMin" title="minimize"></button>
-        <button class="tl-btn tl-full" id="tlFull" title="fullscreen"></button>
+        <button class="tl-btn tl-full" id="tlFull" title="maximize"></button>
       </div>
+
       <div class="brand">TodoLite</div>
+
       <button class="nav active no-drag" data-page="tasks">Tasks</button>
       <button class="nav no-drag" data-page="settings">Settings</button>
+
       <div class="spacer"></div>
     </aside>
+
     <section class="page no-drag" id="tasksPage">
       <div class="topbar drag">
         <div>
@@ -26,51 +30,118 @@
         </div>
         <button id="newBtn" class="primary no-drag">+</button>
       </div>
+
       <div id="activeList" class="block"></div>
       <div id="completedList" class="block completed-block"></div>
     </section>
+
     <section class="page no-drag hidden" id="settingsPage">
-      <div class="topbar drag"><div><h1>Settings</h1><p>per-window appearance</p></div></div>
+      <div class="topbar drag">
+        <div>
+          <h1>Settings</h1>
+          <p>global first, then surfaces</p>
+        </div>
+      </div>
+
       <div class="settings-columns">
         <div class="settings-col">
-          <div class="col-title">Widget</div>
+          <div class="col-title">Global</div>
+
           <div class="settings-grid">
-            <label>Font
-              <div class="font-dropdown no-drag" id="widgetFontDropdown">
-                <div class="font-selected" id="widgetFontSelected">system</div>
-                <div class="font-panel">
-                  <input class="font-search" id="widgetFontSearch" placeholder="search..." autocomplete="off" />
-                  <div class="font-list" id="widgetFontList"></div>
+            <label>
+              Font
+              <div class="liquid-select font-select no-drag" id="globalFontDropdown">
+                <button class="liquid-select-trigger" id="globalFontSelected" type="button">system</button>
+                <div class="liquid-select-menu">
+                  <input class="liquid-search" id="globalFontSearch" placeholder="search..." autocomplete="off" />
+                  <div class="liquid-options" id="globalFontList"></div>
                 </div>
               </div>
             </label>
-            <label>Font size<input id="widgetFontSize" type="range" min="11" max="20" step="1"></label>
-            <label>Opacity<input id="widgetGlassOpacity" type="range" min="0.06" max="0.50" step="0.01"></label>
-            <label>Blur<input id="widgetBlurStrength" type="range" min="8" max="48" step="1"></label>
-            <label>Radius<input id="widgetCornerRadius" type="range" min="10" max="36" step="1"></label>
+
+            <label>
+              Font size
+              <input id="globalFontSize" type="range" min="11" max="22" step="1">
+            </label>
+
+            <label>
+              Language
+              <div class="liquid-select no-drag" id="languageDropdown">
+                <button class="liquid-select-trigger" id="languageSelected" type="button">简体中文</button>
+                <div class="liquid-select-menu">
+                  <div class="liquid-options" id="languageList"></div>
+                </div>
+              </div>
+            </label>
           </div>
         </div>
+
+        <div class="settings-col">
+          <div class="col-title">Widget</div>
+
+          <div class="settings-grid">
+            <label>
+              Opacity
+              <input id="widgetGlassOpacity" type="range" min="0.06" max="0.60" step="0.01">
+            </label>
+
+            <label>
+              Blur
+              <input id="widgetBlurStrength" type="range" min="0" max="64" step="1">
+            </label>
+
+            <label>
+              Radius
+              <input id="widgetCornerRadius" type="range" min="10" max="42" step="1">
+            </label>
+          </div>
+        </div>
+
         <div class="settings-col">
           <div class="col-title">Panel</div>
+
           <div class="settings-grid">
-            <label>Opacity<input id="panelGlassOpacity" type="range" min="0.08" max="0.60" step="0.01"></label>
-            <label>Blur<input id="panelBlurStrength" type="range" min="4" max="36" step="1"></label>
-            <label>Radius<input id="panelCornerRadius" type="range" min="10" max="36" step="1"></label>
-            <label>Layer<select id="windowLevel"><option value="desktop">desktop</option><option value="normal">normal</option><option value="topmost">topmost</option></select></label>
+            <label>
+              Opacity
+              <input id="panelGlassOpacity" type="range" min="0.06" max="0.70" step="0.01">
+            </label>
+
+            <label>
+              Blur
+              <input id="panelBlurStrength" type="range" min="0" max="64" step="1">
+            </label>
+
+            <label>
+              Radius
+              <input id="panelCornerRadius" type="range" min="10" max="42" step="1">
+            </label>
+
+            <label>
+              Layer
+              <div class="liquid-select no-drag" id="windowLevelDropdown">
+                <button class="liquid-select-trigger" id="windowLevelSelected" type="button">desktop</button>
+                <div class="liquid-select-menu">
+                  <div class="liquid-options" id="windowLevelList"></div>
+                </div>
+              </div>
+            </label>
           </div>
         </div>
       </div>
+
       <div class="data-actions">
         <button id="openData">open data</button>
         <button id="openBackups">open backups</button>
       </div>
     </section>
   </main>
+
   <dialog id="editor" class="glass no-drag">
     <form method="dialog" id="form">
       <input id="content" placeholder="content" autocomplete="off" />
       <input id="ddl" type="datetime-local" step="1" />
       <textarea id="detail" placeholder="detail, optional"></textarea>
+
       <div class="dialog-actions">
         <button value="cancel" type="button" id="deleteBtn" class="danger">remove</button>
         <div class="grow"></div>
@@ -79,6 +150,7 @@
       </div>
     </form>
   </dialog>
+
   <script src="panel.js"></script>
 </body>
 </html>

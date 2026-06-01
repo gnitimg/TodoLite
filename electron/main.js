@@ -12,9 +12,12 @@ let settingsPath;
 let backupDir;
 
 const defaultSettings = {
-  widget: {
+  global: {
     fontFamily: 'system',
     fontSize: 14,
+    language: 'zh-CN'
+  },
+  widget: {
     glassOpacity: 0.14,
     blurStrength: 36,
     cornerRadius: 24,
@@ -27,8 +30,6 @@ const defaultSettings = {
     }
   },
   panel: {
-    fontFamily: 'system',
-    fontSize: 14,
     glassOpacity: 0.20,
     blurStrength: 18,
     cornerRadius: 22,
@@ -70,33 +71,93 @@ function writeJsonDirect(file, value) {
   fs.writeFileSync(file, JSON.stringify(value, null, 2), 'utf8');
 }
 
-function mergeSettings(current = {}, patch = {}) {
+function migrateSettings(raw = {}) {
+  const oldFontFamily = raw.fontFamily || raw.global?.fontFamily || raw.widget?.fontFamily || raw.panel?.fontFamily;
+  const oldFontSize = raw.fontSize || raw.global?.fontSize || raw.widget?.fontSize || raw.panel?.fontSize;
+
   return {
     ...defaultSettings,
-    ...current,
-    ...patch,
+    ...raw,
+    global: {
+      ...defaultSettings.global,
+      ...(raw.global || {}),
+      fontFamily: oldFontFamily || defaultSettings.global.fontFamily,
+      fontSize: oldFontSize || defaultSettings.global.fontSize,
+      language: raw.global?.language || raw.language || defaultSettings.global.language
+    },
     widget: {
       ...defaultSettings.widget,
-      ...(current.widget || {}),
+      ...(raw.widget || {}),
+      fontFamily: undefined,
+      fontSize: undefined,
+      bounds: {
+        ...defaultSettings.widget.bounds,
+        ...((raw.widget || {}).bounds || {})
+      }
+    },
+    panel: {
+      ...defaultSettings.panel,
+      ...(raw.panel || {}),
+      fontFamily: undefined,
+      fontSize: undefined,
+      bounds: {
+        ...defaultSettings.panel.bounds,
+        ...((raw.panel || {}).bounds || {})
+      }
+    },
+    windowLevel: raw.windowLevel || defaultSettings.windowLevel
+  };
+}
+
+function cleanUndefined(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+
+  for (const key of Object.keys(obj)) {
+    if (obj[key] === undefined) {
+      delete obj[key];
+    } else if (obj[key] && typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
+      cleanUndefined(obj[key]);
+    }
+  }
+
+  return obj;
+}
+
+function mergeSettings(current = {}, patch = {}) {
+  const base = migrateSettings(current);
+
+  const merged = {
+    ...base,
+    ...patch,
+    global: {
+      ...defaultSettings.global,
+      ...(base.global || {}),
+      ...(patch.global || {})
+    },
+    widget: {
+      ...defaultSettings.widget,
+      ...(base.widget || {}),
       ...(patch.widget || {}),
       bounds: {
         ...defaultSettings.widget.bounds,
-        ...((current.widget || {}).bounds || {}),
+        ...((base.widget || {}).bounds || {}),
         ...((patch.widget || {}).bounds || {})
       }
     },
     panel: {
       ...defaultSettings.panel,
-      ...(current.panel || {}),
+      ...(base.panel || {}),
       ...(patch.panel || {}),
       bounds: {
         ...defaultSettings.panel.bounds,
-        ...((current.panel || {}).bounds || {}),
+        ...((base.panel || {}).bounds || {}),
         ...((patch.panel || {}).bounds || {})
       }
     },
-    windowLevel: patch.windowLevel ?? current.windowLevel ?? defaultSettings.windowLevel
+    windowLevel: patch.windowLevel ?? base.windowLevel ?? defaultSettings.windowLevel
   };
+
+  return cleanUndefined(merged);
 }
 
 function ensureDataFiles() {
@@ -185,8 +246,8 @@ function broadcastTodos() {
 
 function broadcastSettings() {
   const settings = readJson(settingsPath, defaultSettings);
-  widgetWindow?.webContents.send('settings:changed', settings);
-  panelWindow?.webContents.send('settings:changed', settings);
+  widgetWindow?.webContents.send('settings:changed', mergeSettings(settings));
+  panelWindow?.webContents.send('settings:changed', mergeSettings(settings));
 }
 
 function applyWindowLevel(settings) {
@@ -246,7 +307,7 @@ function debounceSaveBounds(kind) {
 }
 
 function createWindows() {
-  const settings = readJson(settingsPath, defaultSettings);
+  const settings = mergeSettings(readJson(settingsPath, defaultSettings));
   const ws = settings.widget || defaultSettings.widget;
   const ps = settings.panel || defaultSettings.panel;
   const wb = ws.bounds || defaultSettings.widget.bounds;
@@ -377,7 +438,7 @@ function scanProjectFonts() {
 }
 
 ipcMain.handle('todos:get', () => readJson(todosPath, baseTodoData()));
-ipcMain.handle('settings:get', () => readJson(settingsPath, defaultSettings));
+ipcMain.handle('settings:get', () => mergeSettings(readJson(settingsPath, defaultSettings)));
 ipcMain.handle('fonts:list', () => ({ project: scanProjectFonts(), system: [] }));
 
 ipcMain.handle('todos:add', (_, todo) => {

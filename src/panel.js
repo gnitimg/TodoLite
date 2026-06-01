@@ -14,6 +14,17 @@ const detail = document.getElementById('detail');
 const deleteBtn = document.getElementById('deleteBtn');
 const tlFull = document.getElementById('tlFull');
 
+const languageOptions = [
+  { value: 'zh-CN', label: '简体中文' },
+  { value: 'en-US', label: 'English' }
+];
+
+const windowLevelOptions = [
+  { value: 'desktop', label: 'desktop' },
+  { value: 'normal', label: 'normal' },
+  { value: 'topmost', label: 'topmost' }
+];
+
 function toLocalInput(value) {
   return String(value || '').replace(' ', 'T');
 }
@@ -28,53 +39,56 @@ function fromLocalInput(value) {
   return v;
 }
 
-function setGlassVar(target, name, value) {
-  if (target) {
-    target.style.setProperty(name, value);
-  } else {
-    document.documentElement.style.setProperty(name, value);
-  }
+function setCssVar(target, name, value) {
+  document.documentElement.style.setProperty(name, value);
+  if (target) target.style.setProperty(name, value);
+}
+
+function applyGlobalSettings(global) {
+  const g = global || {};
+
+  const family = g.fontFamily && g.fontFamily !== 'system'
+    ? `'${g.fontFamily}', 'Segoe UI', system-ui, sans-serif`
+    : `Inter, 'Segoe UI', system-ui, sans-serif`;
+
+  document.documentElement.lang = g.language || 'zh-CN';
+  document.documentElement.style.setProperty('--font-family', family);
+  document.documentElement.style.setProperty('--font-size', `${g.fontSize || 14}px`);
+
+  document.body.style.fontFamily = family;
+  document.body.style.fontSize = `${g.fontSize || 14}px`;
+}
+
+function applyPanelGlass(ps) {
+  setCssVar(panel, '--opacity', String(ps.glassOpacity ?? .20));
+  setCssVar(panel, '--blur', `${ps.blurStrength ?? 18}px`);
+  setCssVar(panel, '--radius', `${ps.cornerRadius ?? 22}px`);
 }
 
 function applySettings(s) {
   settings = s || {};
 
-  const ps = settings.panel || {};
-  const ws = settings.widget || {};
-
-  setGlassVar(panel, '--font-size', `${ps.fontSize || 14}px`);
-  setGlassVar(panel, '--opacity', ps.glassOpacity ?? .20);
-  setGlassVar(panel, '--blur', `${ps.blurStrength || 18}px`);
-  setGlassVar(panel, '--radius', `${ps.cornerRadius || 22}px`);
-
-  setGlassVar(
-    panel,
-    '--font-family',
-    ws.fontFamily && ws.fontFamily !== 'system'
-      ? `'${ws.fontFamily}', 'Segoe UI', system-ui, sans-serif`
-      : `Inter, 'Segoe UI', system-ui, sans-serif`
-  );
-
+  applyGlobalSettings(settings.global || {});
+  applyPanelGlass(settings.panel || {});
   syncSettingsUI();
 }
 
 function syncSettingsUI() {
+  const g = settings.global || {};
   const ws = settings.widget || {};
   const ps = settings.panel || {};
 
-  setVal('widgetFontSize', ws.fontSize || 14);
+  setVal('globalFontSize', g.fontSize || 14);
   setVal('widgetGlassOpacity', ws.glassOpacity ?? .14);
-  setVal('widgetBlurStrength', ws.blurStrength || 36);
-  setVal('widgetCornerRadius', ws.cornerRadius || 24);
-
+  setVal('widgetBlurStrength', ws.blurStrength ?? 36);
+  setVal('widgetCornerRadius', ws.cornerRadius ?? 24);
   setVal('panelGlassOpacity', ps.glassOpacity ?? .20);
-  setVal('panelBlurStrength', ps.blurStrength || 18);
-  setVal('panelCornerRadius', ps.cornerRadius || 22);
-
-  const level = document.getElementById('windowLevel');
-  if (level) level.value = settings.windowLevel || 'desktop';
+  setVal('panelBlurStrength', ps.blurStrength ?? 18);
+  setVal('panelCornerRadius', ps.cornerRadius ?? 22);
 
   updateFontSelected();
+  updateLanguageSelected();
+  updateWindowLevelSelected();
 }
 
 function setVal(id, val) {
@@ -85,12 +99,24 @@ function setVal(id, val) {
 }
 
 function updateFontSelected() {
-  const ws = settings.widget || {};
-  const name = ws.fontFamily || 'system';
-  const selected = document.getElementById('widgetFontSelected');
+  const g = settings.global || {};
+  const name = g.fontFamily || 'system';
+  const selected = document.getElementById('globalFontSelected');
 
   selected.textContent = name;
   selected.style.fontFamily = name !== 'system' ? `'${name}', sans-serif` : '';
+}
+
+function updateLanguageSelected() {
+  const value = settings.global?.language || 'zh-CN';
+  const option = languageOptions.find(item => item.value === value) || languageOptions[0];
+  document.getElementById('languageSelected').textContent = option.label;
+}
+
+function updateWindowLevelSelected() {
+  const value = settings.windowLevel || 'desktop';
+  const option = windowLevelOptions.find(item => item.value === value) || windowLevelOptions[0];
+  document.getElementById('windowLevelSelected').textContent = option.label;
 }
 
 function injectProjectFonts(list) {
@@ -108,32 +134,75 @@ function injectProjectFonts(list) {
   document.head.appendChild(style);
 }
 
+function closeAllLiquidSelects(except) {
+  document.querySelectorAll('.liquid-select.open').forEach(item => {
+    if (item !== except) item.classList.remove('open');
+  });
+}
+
+function initLiquidSelect({ rootId, triggerId, listId, options, getValue, onChange }) {
+  const root = document.getElementById(rootId);
+  const trigger = document.getElementById(triggerId);
+  const list = document.getElementById(listId);
+
+  function renderOptions() {
+    const current = getValue();
+    list.innerHTML = '';
+
+    for (const option of options) {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'liquid-option' + (option.value === current ? ' active' : '');
+      item.textContent = option.label;
+
+      item.onclick = async event => {
+        event.stopPropagation();
+        root.classList.remove('open');
+        await onChange(option.value);
+      };
+
+      list.appendChild(item);
+    }
+  }
+
+  trigger.onclick = event => {
+    event.stopPropagation();
+
+    const isOpen = root.classList.contains('open');
+    closeAllLiquidSelects(root);
+    root.classList.toggle('open', !isOpen);
+
+    if (!isOpen) renderOptions();
+  };
+}
+
 function buildFontList(filter) {
-  const list = document.getElementById('widgetFontList');
+  const list = document.getElementById('globalFontList');
   list.innerHTML = '';
 
   const f = (filter || '').toLowerCase();
   const projectFiltered = (fonts.project || []).filter(font => !f || font.name.toLowerCase().includes(f));
-  const currentFont = (settings.widget || {}).fontFamily || 'system';
+  const currentFont = (settings.global || {}).fontFamily || 'system';
 
   function addOption(font) {
-    const opt = document.createElement('div');
+    const opt = document.createElement('button');
 
-    opt.className = 'font-option' + (font.name === currentFont ? ' active' : '');
+    opt.type = 'button';
+    opt.className = 'liquid-option' + (font.name === currentFont ? ' active' : '');
     opt.textContent = font.name;
     opt.style.fontFamily = font.name !== 'system' ? `'${font.name}', sans-serif` : '';
 
     opt.onclick = async () => {
       const next = await window.todoLite.updateSettings({
-        widget: {
+        global: {
           fontFamily: font.name
         }
       });
 
       applySettings(next);
 
-      document.getElementById('widgetFontDropdown').classList.remove('open');
-      document.getElementById('widgetFontSearch').value = '';
+      document.getElementById('globalFontDropdown').classList.remove('open');
+      document.getElementById('globalFontSearch').value = '';
     };
 
     list.appendChild(opt);
@@ -143,7 +212,7 @@ function buildFontList(filter) {
 
   if (projectFiltered.length) {
     const sep = document.createElement('div');
-    sep.className = 'font-sep';
+    sep.className = 'liquid-sep';
     sep.textContent = 'fonts';
     list.appendChild(sep);
 
@@ -152,29 +221,30 @@ function buildFontList(filter) {
 
   if (!projectFiltered.length && f) {
     const empty = document.createElement('div');
-    empty.className = 'font-option empty-font';
+    empty.className = 'liquid-empty';
     empty.textContent = 'no match';
     list.appendChild(empty);
   }
 
   if (!projectFiltered.length && !f) {
     const empty = document.createElement('div');
-    empty.className = 'font-option empty-font';
+    empty.className = 'liquid-empty';
     empty.textContent = 'put .ttf / .otf / .woff in fonts';
     list.appendChild(empty);
   }
 }
 
 function initFontDropdown() {
-  const dropdown = document.getElementById('widgetFontDropdown');
-  const selected = document.getElementById('widgetFontSelected');
-  const search = document.getElementById('widgetFontSearch');
+  const dropdown = document.getElementById('globalFontDropdown');
+  const selected = document.getElementById('globalFontSelected');
+  const search = document.getElementById('globalFontSearch');
 
   selected.onclick = event => {
     event.stopPropagation();
 
     const wasOpen = dropdown.classList.contains('open');
-    dropdown.classList.toggle('open');
+    closeAllLiquidSelects(dropdown);
+    dropdown.classList.toggle('open', !wasOpen);
 
     if (!wasOpen) {
       search.value = '';
@@ -190,12 +260,6 @@ function initFontDropdown() {
       dropdown.classList.remove('open');
     }
   };
-
-  document.addEventListener('click', event => {
-    if (!dropdown.contains(event.target)) {
-      dropdown.classList.remove('open');
-    }
-  });
 }
 
 function makeTask(item, done = false) {
@@ -349,7 +413,7 @@ for (const btn of document.querySelectorAll('.nav')) {
 }
 
 for (const [id, path] of [
-  ['widgetFontSize', 'widget.fontSize'],
+  ['globalFontSize', 'global.fontSize'],
   ['widgetGlassOpacity', 'widget.glassOpacity'],
   ['widgetBlurStrength', 'widget.blurStrength'],
   ['widgetCornerRadius', 'widget.cornerRadius'],
@@ -372,15 +436,11 @@ for (const [id, path] of [
   };
 }
 
-document.getElementById('windowLevel').oninput = async event => {
-  const next = await window.todoLite.updateSettings({
-    windowLevel: event.target.value
-  });
-
-  applySettings(next);
-};
-
 panel?.addEventListener('pointermove', updateLiquidSpot);
+
+document.addEventListener('click', () => {
+  closeAllLiquidSelects();
+});
 
 window.todoLite.onTodosChanged(data => {
   todos = data;
@@ -404,6 +464,37 @@ window.todoLite.onPanelFullscreenChanged(isFull => {
 
   applySettings(settings);
   initFontDropdown();
+
+  initLiquidSelect({
+    rootId: 'languageDropdown',
+    triggerId: 'languageSelected',
+    listId: 'languageList',
+    options: languageOptions,
+    getValue: () => settings.global?.language || 'zh-CN',
+    onChange: async value => {
+      const next = await window.todoLite.updateSettings({
+        global: {
+          language: value
+        }
+      });
+      applySettings(next);
+    }
+  });
+
+  initLiquidSelect({
+    rootId: 'windowLevelDropdown',
+    triggerId: 'windowLevelSelected',
+    listId: 'windowLevelList',
+    options: windowLevelOptions,
+    getValue: () => settings.windowLevel || 'desktop',
+    onChange: async value => {
+      const next = await window.todoLite.updateSettings({
+        windowLevel: value
+      });
+      applySettings(next);
+    }
+  });
+
   render();
 
   const isFull = await window.todoLite.getPanelFullscreenState();
