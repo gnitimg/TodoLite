@@ -1,3 +1,5 @@
 node_modules/
 dist/
 data/backups/
+release/
+dist/

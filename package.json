@@ -1,16 +1,73 @@
 {
   "name": "todolite",
+  "productName": "TodoLite",
   "version": "0.1.0",
   "description": "A minimal Windows liquid-glass desktop todo layer.",
   "main": "electron/main.js",
   "scripts": {
     "dev": "electron .",
-    "start": "electron ."
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win"
   },
-  "keywords": ["todo", "electron", "desktop", "minimal"],
+  "keywords": [
+    "todo",
+    "electron",
+    "desktop",
+    "minimal"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^39.2.7"
+    "electron": "^39.2.7",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.gnitimg.todolite",
+    "productName": "TodoLite",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "fonts/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "fonts",
+        "to": "fonts",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "TodoLite"
+    }
   }
 }
