@@ -327,7 +327,7 @@ function applyWidgetLayer(settings) {
   }
 
   // desktop：最低干扰层，只控制小 TodoList。
-  // 这里不置顶、不进任务栏、不抢焦点。
+  // 纯 Electron 无法稳定挂到 WorkerW 桌面层，这里尽量避免抢焦点和任务栏出现。
   widgetWindow.setFocusable(false);
   widgetWindow.showInactive();
   enforceWidgetTrayOnly();
@@ -474,14 +474,14 @@ function createWindows() {
   });
 
   widgetWindow.loadFile(path.join(root, 'src', 'widget.html'));
-  widgetWindow.on('show', enforceWidgetTrayOnly);
-  widgetWindow.on('focus', enforceWidgetTrayOnly);
-  widgetWindow.on('restore', enforceWidgetTrayOnly);
 
   widgetWindow.once('ready-to-show', () => {
     applyWidgetLayer(settings);
   });
 
+  widgetWindow.on('show', enforceWidgetTrayOnly);
+  widgetWindow.on('focus', enforceWidgetTrayOnly);
+  widgetWindow.on('restore', enforceWidgetTrayOnly);
   widgetWindow.on('moved', () => debounceSaveBounds('widget'));
   widgetWindow.on('resized', () => debounceSaveBounds('widget'));
 
@@ -492,6 +492,7 @@ function createWindows() {
         if (!widgetWindow || widgetWindow.isDestroyed()) return;
         widgetWindow.showInactive();
         widgetWindow.blur();
+        enforceWidgetTrayOnly();
       }, 80);
     }
   });
@@ -502,6 +503,7 @@ function createWindows() {
         if (!widgetWindow || widgetWindow.isDestroyed()) return;
         widgetWindow.showInactive();
         widgetWindow.blur();
+        enforceWidgetTrayOnly();
       }, 120);
     }
   });
@@ -596,11 +598,13 @@ function scanProjectFonts() {
 }
 
 ipcMain.handle('todos:get', () => readJson(todosPath, baseTodoData()));
+
 ipcMain.handle('settings:get', () => {
   const settings = mergeSettings(readJson(settingsPath, defaultSettings));
   settings.global.startup = getStartupStateFromSystem();
   return settings;
 });
+
 ipcMain.handle('fonts:list', () => ({ project: scanProjectFonts(), system: [] }));
 
 ipcMain.handle('todos:add', (_, todo) => {
