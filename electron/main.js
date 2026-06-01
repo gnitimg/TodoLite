@@ -9,6 +9,9 @@ const legacyDataDir = path.join(root, 'data');
 const bundledFontsDir = app.isPackaged
   ? path.join(process.resourcesPath, 'fonts')
   : path.join(root, 'fonts');
+const trayIconPath = app.isPackaged
+  ? path.join(process.resourcesPath, 'build', 'icon.png')
+  : path.join(root, 'build', 'icon.png');
 const userFontsDir = path.join(app.getPath('userData'), 'fonts');
 
 let dataDir;

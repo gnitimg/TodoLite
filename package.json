@@ -16,7 +16,7 @@
     "desktop",
     "minimal"
   ],
-  "author": "",
+  "author": "Gnitimg",
   "license": "MIT",
   "devDependencies": {
     "electron": "^39.2.7",
@@ -33,12 +33,20 @@
       "electron/**/*",
       "src/**/*",
       "fonts/**/*",
+      "build/**/*",
       "package.json"
     ],
     "extraResources": [
       {
         "from": "fonts",
         "to": "fonts",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "build",
+        "to": "build",
         "filter": [
           "**/*"
         ]
