@@ -539,14 +539,22 @@ function bindGlowLifecycle(surface) {
   if (!surface) return;
 
   surface.classList.add('is-idle');
+  surface.classList.remove('is-lit');
 
-  surface.addEventListener('pointerenter', () => {
+  const lightOn = () => {
     surface.classList.remove('is-idle');
-  });
+    surface.classList.add('is-lit');
+  };
 
-  surface.addEventListener('pointerleave', () => {
+  const lightOff = () => {
+    surface.classList.remove('is-lit');
     surface.classList.add('is-idle');
-  });
+  };
+
+  surface.addEventListener('mouseenter', lightOn);
+  surface.addEventListener('pointerenter', lightOn);
+  surface.addEventListener('mouseleave', lightOff);
+  surface.addEventListener('pointerleave', lightOff);
 }
 
 function initAccentPicker() {

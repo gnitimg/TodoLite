@@ -13,7 +13,7 @@ const sortBtn = document.getElementById('sortBtn');
 
 const i18n = {
   'zh-CN': {
-    quietList: '安静列表',
+    taskList: '任务列表',
     nothingLeft: '没有剩余任务',
     cancel: '取消',
     save: '保存',
@@ -23,7 +23,7 @@ const i18n = {
     sortOriginal: '恢复原顺序'
   },
   'en-US': {
-    quietList: 'quiet list',
+    taskList: 'task list',
     nothingLeft: 'nothing left',
     cancel: 'cancel',
     save: 'save',
@@ -230,14 +230,22 @@ function bindGlowLifecycle(surface) {
   if (!surface) return;
 
   surface.classList.add('is-idle');
+  surface.classList.remove('is-lit');
 
-  surface.addEventListener('pointerenter', () => {
+  const lightOn = () => {
     surface.classList.remove('is-idle');
-  });
+    surface.classList.add('is-lit');
+  };
 
-  surface.addEventListener('pointerleave', () => {
+  const lightOff = () => {
+    surface.classList.remove('is-lit');
     surface.classList.add('is-idle');
-  });
+  };
+
+  surface.addEventListener('mouseenter', lightOn);
+  surface.addEventListener('pointerenter', lightOn);
+  surface.addEventListener('mouseleave', lightOff);
+  surface.addEventListener('pointerleave', lightOff);
 }
 
 form.onsubmit = async event => {

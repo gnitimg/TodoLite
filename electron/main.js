@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -40,8 +40,7 @@ const defaultSettings = {
       width: 780,
       height: 640
     }
-  },
-  windowLevel: 'desktop'
+  }
 };
 
 let widgetWindow;
@@ -49,6 +48,9 @@ let panelWindow;
 let tray;
 let widgetBoundsTimer = null;
 let panelBoundsTimer = null;
+let panelZoomed = false;
+let panelRestoreBounds = null;
+let panelAnimating = false;
 
 function resolvePaths() {
   dataDir = path.join(app.getPath('userData'), 'data');
@@ -260,16 +262,14 @@ function broadcastSettings() {
 }
 
 function applyStartup(enabled) {
-  const openAtLogin = Boolean(enabled);
-
   try {
     app.setLoginItemSettings({
-      openAtLogin,
+      openAtLogin: Boolean(enabled),
       openAsHidden: false,
       path: process.execPath
     });
   } catch {
-    // Dev mode or portable environments may fail silently.
+    // Dev / portable environments may fail silently.
   }
 }
 
@@ -281,6 +281,11 @@ function getStartupStateFromSystem() {
   }
 }
 
+function getWidgetLayer() {
+  const settings = mergeSettings(readJson(settingsPath, defaultSettings));
+  return settings.widget?.layer || 'desktop';
+}
+
 function applyWidgetLayer(settings) {
   const layer = settings.widget?.layer || 'desktop';
 
@@ -289,6 +294,7 @@ function applyWidgetLayer(settings) {
   widgetWindow.setSkipTaskbar(true);
 
   if (layer === 'topmost') {
+    widgetWindow.setFocusable(true);
     widgetWindow.setAlwaysOnTop(true, 'screen-saver');
     widgetWindow.show();
     return;
@@ -297,14 +303,21 @@ function applyWidgetLayer(settings) {
   widgetWindow.setAlwaysOnTop(false);
 
   if (layer === 'normal') {
+    widgetWindow.setFocusable(true);
     widgetWindow.show();
     return;
   }
 
-  // desktop = 最低干扰层：只控制小 Todo，不控制主面板。
-  // Electron 无法纯原生稳定嵌入 WorkerW 桌面层，这里先做“桌面小组件近似层”：
-  // 不进任务栏、不置顶、不影响主面板。
+  // desktop: 最低干扰层，只控制小 Todo。
+  // 纯 Electron 无法稳定挂到 WorkerW 桌面层，这里尽量避免抢焦点和任务栏出现。
+  widgetWindow.setFocusable(false);
   widgetWindow.showInactive();
+
+  setTimeout(() => {
+    if (!widgetWindow || widgetWindow.isDestroyed()) return;
+    widgetWindow.setFocusable(true);
+    widgetWindow.blur();
+  }, 260);
 }
 
 function saveBounds(kind) {
@@ -339,6 +352,79 @@ function debounceSaveBounds(kind) {
   }
 }
 
+function easeOutCubic(t) {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+function animateWindowBounds(win, target, duration = 260, done) {
+  if (!win || win.isDestroyed() || panelAnimating) return;
+
+  panelAnimating = true;
+
+  const from = win.getBounds();
+  const start = Date.now();
+
+  const tick = () => {
+    if (!win || win.isDestroyed()) {
+      panelAnimating = false;
+      return;
+    }
+
+    const p = Math.min(1, (Date.now() - start) / duration);
+    const e = easeOutCubic(p);
+
+    const next = {
+      x: Math.round(from.x + (target.x - from.x) * e),
+      y: Math.round(from.y + (target.y - from.y) * e),
+      width: Math.round(from.width + (target.width - from.width) * e),
+      height: Math.round(from.height + (target.height - from.height) * e)
+    };
+
+    win.setBounds(next, false);
+
+    if (p < 1) {
+      setTimeout(tick, 1000 / 60);
+    } else {
+      panelAnimating = false;
+      if (typeof done === 'function') done();
+    }
+  };
+
+  tick();
+}
+
+function getPanelZoomTarget() {
+  const display = screen.getDisplayMatching(panelWindow.getBounds());
+  const area = display.workArea;
+
+  return {
+    x: area.x + 10,
+    y: area.y + 10,
+    width: area.width - 20,
+    height: area.height - 20
+  };
+}
+
+function showPanel() {
+  if (!panelWindow) return;
+
+  panelWindow.setSkipTaskbar(false);
+  panelWindow.show();
+  panelWindow.focus();
+}
+
+function hidePanel() {
+  if (!panelWindow) return;
+
+  panelWindow.hide();
+  panelWindow.setSkipTaskbar(true);
+}
+
+function togglePanel() {
+  if (!panelWindow) return;
+  panelWindow.isVisible() ? hidePanel() : showPanel();
+}
+
 function createWindows() {
   const settings = mergeSettings(readJson(settingsPath, defaultSettings));
   const ws = settings.widget || defaultSettings.widget;
@@ -358,7 +444,7 @@ function createWindows() {
     backgroundColor: '#00000000',
     resizable: true,
     hasShadow: false,
-    show: true,
+    show: false,
     skipTaskbar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -368,8 +454,34 @@ function createWindows() {
   });
 
   widgetWindow.loadFile(path.join(root, 'src', 'widget.html'));
+
+  widgetWindow.once('ready-to-show', () => {
+    applyWidgetLayer(settings);
+  });
+
   widgetWindow.on('moved', () => debounceSaveBounds('widget'));
   widgetWindow.on('resized', () => debounceSaveBounds('widget'));
+
+  widgetWindow.on('minimize', event => {
+    if (getWidgetLayer() === 'desktop') {
+      event.preventDefault();
+      setTimeout(() => {
+        if (!widgetWindow || widgetWindow.isDestroyed()) return;
+        widgetWindow.showInactive();
+        widgetWindow.blur();
+      }, 80);
+    }
+  });
+
+  widgetWindow.on('hide', () => {
+    if (getWidgetLayer() === 'desktop' && !app.isQuiting) {
+      setTimeout(() => {
+        if (!widgetWindow || widgetWindow.isDestroyed()) return;
+        widgetWindow.showInactive();
+        widgetWindow.blur();
+      }, 120);
+    }
+  });
 
   panelWindow = new BrowserWindow({
     width: pb.width || 780,
@@ -382,6 +494,7 @@ function createWindows() {
     resizable: true,
     hasShadow: true,
     show: false,
+    skipTaskbar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -397,19 +510,9 @@ function createWindows() {
   panelWindow.on('close', event => {
     if (!app.isQuiting) {
       event.preventDefault();
-      panelWindow.hide();
+      hidePanel();
     }
   });
-
-  panelWindow.on('maximize', () => {
-    panelWindow?.webContents.send('panel:maximize-changed', true);
-  });
-
-  panelWindow.on('unmaximize', () => {
-    panelWindow?.webContents.send('panel:maximize-changed', false);
-  });
-
-  applyWidgetLayer(settings);
 }
 
 function createTray() {
@@ -430,7 +533,7 @@ function createTray() {
     { label: 'Open TodoLite', click: showPanel },
     {
       label: 'Show / Hide Desktop Layer',
-      click: () => widgetWindow?.isVisible() ? widgetWindow.hide() : widgetWindow.show()
+      click: () => widgetWindow?.isVisible() ? widgetWindow.hide() : widgetWindow.showInactive()
     },
     { type: 'separator' },
     {
@@ -441,17 +544,6 @@ function createTray() {
       }
     }
   ]));
-}
-
-function showPanel() {
-  if (!panelWindow) return;
-  panelWindow.show();
-  panelWindow.focus();
-}
-
-function togglePanel() {
-  if (!panelWindow) return;
-  panelWindow.isVisible() ? panelWindow.hide() : showPanel();
 }
 
 function scanProjectFonts() {
@@ -614,26 +706,31 @@ ipcMain.handle('settings:update', (_, patch) => {
 
 ipcMain.handle('folder:open-data', () => shell.openPath(dataDir));
 ipcMain.handle('folder:open-backups', () => shell.openPath(backupDir));
-ipcMain.handle('app:close-panel', () => panelWindow?.hide());
+ipcMain.handle('app:close-panel', () => hidePanel());
 ipcMain.handle('app:minimize-panel', () => panelWindow?.minimize());
 
 ipcMain.handle('app:fullscreen-panel', () => {
-  if (!panelWindow) return false;
+  if (!panelWindow || panelAnimating) return panelZoomed;
 
-  if (panelWindow.isMaximized()) {
-    panelWindow.unmaximize();
+  if (panelZoomed) {
+    const target = panelRestoreBounds || mergeSettings(readJson(settingsPath, defaultSettings)).panel.bounds;
+    panelZoomed = false;
     panelWindow.webContents.send('panel:maximize-changed', false);
+    animateWindowBounds(panelWindow, target, 260, () => debounceSaveBounds('panel'));
     return false;
   }
 
-  panelWindow.maximize();
+  panelRestoreBounds = panelWindow.getBounds();
+  const target = getPanelZoomTarget();
+
+  panelZoomed = true;
   panelWindow.webContents.send('panel:maximize-changed', true);
+  animateWindowBounds(panelWindow, target, 260);
+
   return true;
 });
 
-ipcMain.handle('app:panel-fullscreen-state', () => {
-  return panelWindow?.isMaximized() || false;
-});
+ipcMain.handle('app:panel-fullscreen-state', () => panelZoomed);
 
 ipcMain.handle('app:quit', () => {
   app.isQuiting = true;

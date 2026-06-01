@@ -389,3 +389,95 @@ textarea {
 .liquid-toggle.active .toggle-text {
   color: var(--text);
 }
+
+.glass::before {
+  transition:
+    opacity .55s ease,
+    background .18s ease,
+    filter .55s ease;
+}
+
+.glass.is-lit::before {
+  opacity: 1;
+  filter: blur(0);
+  transition:
+    opacity .14s ease,
+    filter .14s ease;
+}
+
+.glass.is-idle::before {
+  opacity: 0;
+  filter: blur(14px);
+  transition:
+    opacity 1.25s cubic-bezier(.2,.8,.2,1),
+    filter 1.25s cubic-bezier(.2,.8,.2,1);
+}
+
+.glass.is-lit::after {
+  opacity: .06;
+  transition: opacity .18s ease;
+}
+
+.glass.is-idle::after {
+  opacity: .015;
+  transition: opacity 1.25s cubic-bezier(.2,.8,.2,1);
+}
+
+.liquid-toggle {
+  position: relative;
+  width: 100%;
+  min-height: 38px;
+  padding: 5px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255,255,255,.72), transparent 34%),
+    linear-gradient(135deg, rgba(255,255,255,.38), rgba(255,255,255,.16));
+  border: 1px solid rgba(255,255,255,.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.48),
+    0 10px 28px rgba(0,0,0,.06);
+}
+
+.liquid-toggle .toggle-dot {
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  transform: translate(0, -50%);
+  background: rgba(255,255,255,.76);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.72),
+    0 8px 20px rgba(0,0,0,.12);
+  transition:
+    left .24s cubic-bezier(.2,.8,.2,1),
+    transform .24s cubic-bezier(.2,.8,.2,1),
+    background .22s ease;
+}
+
+.liquid-toggle .toggle-text {
+  padding-left: 34px;
+  color: var(--muted);
+  transition: color .2s ease;
+}
+
+.liquid-toggle.active {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255,255,255,.78), transparent 34%),
+    linear-gradient(135deg, rgba(var(--accent-rgb), .24), rgba(255,255,255,.18));
+  border-color: rgba(var(--accent-rgb), .30);
+}
+
+.liquid-toggle.active .toggle-dot {
+  left: calc(100% - 32px);
+  background: rgba(var(--accent-rgb), .76);
+}
+
+.liquid-toggle.active .toggle-text {
+  color: var(--text);
+}
