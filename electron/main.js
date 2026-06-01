@@ -43,6 +43,8 @@ const defaultSettings = {
 let widgetWindow;
 let panelWindow;
 let tray;
+let widgetBoundsTimer = null;
+let panelBoundsTimer = null;
 
 function resolvePaths() {
   dataDir = path.join(app.getPath('userData'), 'data');
@@ -191,24 +193,35 @@ function applyWindowLevel(settings) {
   const level = settings.windowLevel || 'desktop';
 
   if (widgetWindow) {
-    widgetWindow.setAlwaysOnTop(level === 'topmost', level === 'topmost' ? 'screen-saver' : undefined);
     widgetWindow.setSkipTaskbar(true);
+
+    if (level === 'topmost') {
+      widgetWindow.setAlwaysOnTop(true, 'screen-saver');
+    } else {
+      widgetWindow.setAlwaysOnTop(false);
+    }
   }
 
   if (panelWindow) {
-    panelWindow.setAlwaysOnTop(level === 'topmost', level === 'topmost' ? 'screen-saver' : undefined);
+    if (level === 'topmost') {
+      panelWindow.setAlwaysOnTop(true, 'screen-saver');
+    } else {
+      panelWindow.setAlwaysOnTop(false);
+    }
+
     panelWindow.setSkipTaskbar(level === 'desktop');
   }
 }
 
-function saveWidgetBounds() {
-  if (!widgetWindow || widgetWindow.isDestroyed()) return;
+function saveBounds(kind) {
+  const win = kind === 'widget' ? widgetWindow : panelWindow;
+  if (!win || win.isDestroyed()) return;
 
   const current = readJson(settingsPath, defaultSettings);
-  const bounds = widgetWindow.getBounds();
+  const bounds = win.getBounds();
 
   const next = mergeSettings(current, {
-    widget: {
+    [kind]: {
       bounds: {
         x: bounds.x,
         y: bounds.y,
@@ -220,6 +233,16 @@ function saveWidgetBounds() {
 
   atomicWriteJson(settingsPath, next, false);
   broadcastSettings();
+}
+
+function debounceSaveBounds(kind) {
+  if (kind === 'widget') {
+    clearTimeout(widgetBoundsTimer);
+    widgetBoundsTimer = setTimeout(() => saveBounds('widget'), 220);
+  } else {
+    clearTimeout(panelBoundsTimer);
+    panelBoundsTimer = setTimeout(() => saveBounds('panel'), 220);
+  }
 }
 
 function createWindows() {
@@ -234,9 +257,12 @@ function createWindows() {
     height: wb.height || 340,
     x: Number.isFinite(wb.x) ? wb.x : 36,
     y: Number.isFinite(wb.y) ? wb.y : 80,
+    minWidth: 280,
+    minHeight: 180,
     frame: false,
     transparent: true,
-    resizable: false,
+    backgroundColor: '#00000000',
+    resizable: true,
     hasShadow: false,
     show: true,
     skipTaskbar: true,
@@ -248,14 +274,19 @@ function createWindows() {
   });
 
   widgetWindow.loadFile(path.join(root, 'src', 'widget.html'));
-  widgetWindow.on('moved', saveWidgetBounds);
+  widgetWindow.on('moved', () => debounceSaveBounds('widget'));
+  widgetWindow.on('resized', () => debounceSaveBounds('widget'));
 
   panelWindow = new BrowserWindow({
     width: pb.width || 780,
     height: pb.height || 640,
+    minWidth: 620,
+    minHeight: 460,
     frame: false,
     transparent: true,
+    backgroundColor: '#00000000',
     resizable: true,
+    hasShadow: true,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -266,6 +297,9 @@ function createWindows() {
 
   panelWindow.loadFile(path.join(root, 'src', 'panel.html'));
 
+  panelWindow.on('moved', () => debounceSaveBounds('panel'));
+  panelWindow.on('resized', () => debounceSaveBounds('panel'));
+
   panelWindow.on('close', event => {
     if (!app.isQuiting) {
       event.preventDefault();
@@ -273,12 +307,12 @@ function createWindows() {
     }
   });
 
-  panelWindow.on('enter-full-screen', () => {
-    panelWindow?.webContents.send('panel:fullscreen-changed', true);
+  panelWindow.on('maximize', () => {
+    panelWindow?.webContents.send('panel:maximize-changed', true);
   });
 
-  panelWindow.on('leave-full-screen', () => {
-    panelWindow?.webContents.send('panel:fullscreen-changed', false);
+  panelWindow.on('unmaximize', () => {
+    panelWindow?.webContents.send('panel:maximize-changed', false);
   });
 
   applyWindowLevel(settings);
@@ -487,15 +521,19 @@ ipcMain.handle('app:minimize-panel', () => panelWindow?.minimize());
 ipcMain.handle('app:fullscreen-panel', () => {
   if (!panelWindow) return false;
 
-  const next = !panelWindow.isFullScreen();
-  panelWindow.setFullScreen(next);
-  panelWindow.webContents.send('panel:fullscreen-changed', next);
+  if (panelWindow.isMaximized()) {
+    panelWindow.unmaximize();
+    panelWindow.webContents.send('panel:maximize-changed', false);
+    return false;
+  }
 
-  return next;
+  panelWindow.maximize();
+  panelWindow.webContents.send('panel:maximize-changed', true);
+  return true;
 });
 
 ipcMain.handle('app:panel-fullscreen-state', () => {
-  return panelWindow?.isFullScreen() || false;
+  return panelWindow?.isMaximized() || false;
 });
 
 ipcMain.handle('app:quit', () => {

@@ -34,7 +34,7 @@ contextBridge.exposeInMainWorld('todoLite', {
   },
 
   onPanelFullscreenChanged: cb => {
-    ipcRenderer.removeAllListeners('panel:fullscreen-changed');
-    ipcRenderer.on('panel:fullscreen-changed', (_, value) => cb(value));
+    ipcRenderer.removeAllListeners('panel:maximize-changed');
+    ipcRenderer.on('panel:maximize-changed', (_, value) => cb(value));
   }
 });

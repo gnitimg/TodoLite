@@ -3,6 +3,7 @@ let settings = {};
 let fonts = { project: [], system: [] };
 let editingId = '';
 
+const panel = document.querySelector('.panel');
 const activeList = document.getElementById('activeList');
 const completedList = document.getElementById('completedList');
 const editor = document.getElementById('editor');
@@ -27,18 +28,27 @@ function fromLocalInput(value) {
   return v;
 }
 
+function setGlassVar(target, name, value) {
+  if (target) {
+    target.style.setProperty(name, value);
+  } else {
+    document.documentElement.style.setProperty(name, value);
+  }
+}
+
 function applySettings(s) {
   settings = s || {};
 
   const ps = settings.panel || {};
   const ws = settings.widget || {};
 
-  document.documentElement.style.setProperty('--font-size', `${ps.fontSize || 14}px`);
-  document.documentElement.style.setProperty('--opacity', ps.glassOpacity ?? .20);
-  document.documentElement.style.setProperty('--blur', `${ps.blurStrength || 18}px`);
-  document.documentElement.style.setProperty('--radius', `${ps.cornerRadius || 22}px`);
+  setGlassVar(panel, '--font-size', `${ps.fontSize || 14}px`);
+  setGlassVar(panel, '--opacity', ps.glassOpacity ?? .20);
+  setGlassVar(panel, '--blur', `${ps.blurStrength || 18}px`);
+  setGlassVar(panel, '--radius', `${ps.cornerRadius || 22}px`);
 
-  document.documentElement.style.setProperty(
+  setGlassVar(
+    panel,
     '--font-family',
     ws.fontFamily && ws.fontFamily !== 'system'
       ? `'${ws.fontFamily}', 'Segoe UI', system-ui, sans-serif`
@@ -266,6 +276,22 @@ function openEditor(item) {
   content.focus();
 }
 
+function setFullscreenIconState(isFull) {
+  tlFull.classList.toggle('is-fullscreen', !!isFull);
+  tlFull.title = isFull ? 'restore' : 'maximize';
+}
+
+function updateLiquidSpot(event) {
+  if (!panel) return;
+
+  const rect = panel.getBoundingClientRect();
+  const x = ((event.clientX - rect.left) / rect.width) * 100;
+  const y = ((event.clientY - rect.top) / rect.height) * 100;
+
+  panel.style.setProperty('--spot-x', `${x}%`);
+  panel.style.setProperty('--spot-y', `${y}%`);
+}
+
 form.onsubmit = async event => {
   event.preventDefault();
 
@@ -312,11 +338,6 @@ tlFull.onclick = async () => {
   setFullscreenIconState(isFull);
 };
 
-function setFullscreenIconState(isFull) {
-  tlFull.classList.toggle('is-fullscreen', !!isFull);
-  tlFull.title = isFull ? 'exit fullscreen' : 'fullscreen';
-}
-
 for (const btn of document.querySelectorAll('.nav')) {
   btn.onclick = () => {
     document.querySelectorAll('.nav').forEach(b => b.classList.remove('active'));
@@ -358,6 +379,8 @@ document.getElementById('windowLevel').oninput = async event => {
 
   applySettings(next);
 };
+
+panel?.addEventListener('pointermove', updateLiquidSpot);
 
 window.todoLite.onTodosChanged(data => {
   todos = data;

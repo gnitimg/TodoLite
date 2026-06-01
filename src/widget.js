@@ -2,6 +2,7 @@ let todos = { active: [], completed: {}, removed: [] };
 let settings = {};
 let sortByDdl = false;
 
+const widget = document.querySelector('.widget');
 const list = document.getElementById('list');
 const editor = document.getElementById('editor');
 const form = document.getElementById('form');
@@ -24,19 +25,27 @@ function fromLocalInput(value) {
   return v;
 }
 
+function setGlassVar(target, name, value) {
+  if (target) {
+    target.style.setProperty(name, value);
+  } else {
+    document.documentElement.style.setProperty(name, value);
+  }
+}
+
 function applySettings(s) {
   settings = s || {};
 
   const ws = settings.widget || {};
-
   sortByDdl = !!ws.sortByDdl;
 
-  document.documentElement.style.setProperty('--font-size', `${ws.fontSize || 14}px`);
-  document.documentElement.style.setProperty('--opacity', ws.glassOpacity ?? .14);
-  document.documentElement.style.setProperty('--blur', `${ws.blurStrength || 36}px`);
-  document.documentElement.style.setProperty('--radius', `${ws.cornerRadius || 24}px`);
+  setGlassVar(widget, '--font-size', `${ws.fontSize || 14}px`);
+  setGlassVar(widget, '--opacity', ws.glassOpacity ?? .14);
+  setGlassVar(widget, '--blur', `${ws.blurStrength || 36}px`);
+  setGlassVar(widget, '--radius', `${ws.cornerRadius || 24}px`);
 
-  document.documentElement.style.setProperty(
+  setGlassVar(
+    widget,
     '--font-family',
     ws.fontFamily && ws.fontFamily !== 'system'
       ? `'${ws.fontFamily}', 'Segoe UI', system-ui, sans-serif`
@@ -115,6 +124,17 @@ function openEditor(item) {
   content.focus();
 }
 
+function updateLiquidSpot(event) {
+  if (!widget) return;
+
+  const rect = widget.getBoundingClientRect();
+  const x = ((event.clientX - rect.left) / rect.width) * 100;
+  const y = ((event.clientY - rect.top) / rect.height) * 100;
+
+  widget.style.setProperty('--spot-x', `${x}%`);
+  widget.style.setProperty('--spot-y', `${y}%`);
+}
+
 form.onsubmit = async event => {
   event.preventDefault();
 
@@ -155,6 +175,8 @@ sortBtn.onclick = async () => {
   applySettings(next);
   render();
 };
+
+widget?.addEventListener('pointermove', updateLiquidSpot);
 
 window.todoLite.onTodosChanged(data => {
   todos = data;

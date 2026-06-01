@@ -1,6 +1,4 @@
 .panel {
-  --opacity: .20;
-  --blur: 18px;
   --line: rgba(255,255,255,.30);
   width: 100vw;
   height: 100vh;
@@ -96,45 +94,42 @@
   opacity: 1;
 }
 
+/* macOS-like green button: diagonal corner arrows, not triangles */
 .traffic-lights:hover .tl-full::before,
 .traffic-lights:hover .tl-full::after {
-  width: 0;
-  height: 0;
+  width: 4px;
+  height: 4px;
   opacity: 1;
 }
 
-/* macOS-like fullscreen: two diagonal expand triangles, kept inside 13px dot */
 .traffic-lights:hover .tl-full::before {
-  border-left: 4px solid rgba(0, 60, 0, .66);
-  border-top: 4px solid transparent;
-  left: 3px;
+  right: 3px;
   top: 3px;
-  transform: rotate(45deg);
+  border-top: 1.4px solid rgba(0, 60, 0, .70);
+  border-right: 1.4px solid rgba(0, 60, 0, .70);
 }
 
 .traffic-lights:hover .tl-full::after {
-  border-right: 4px solid rgba(0, 60, 0, .66);
-  border-bottom: 4px solid transparent;
-  right: 3px;
+  left: 3px;
   bottom: 3px;
-  transform: rotate(45deg);
+  border-left: 1.4px solid rgba(0, 60, 0, .70);
+  border-bottom: 1.4px solid rgba(0, 60, 0, .70);
 }
 
-/* exit fullscreen: reverse direction */
 .traffic-lights:hover .tl-full.is-fullscreen::before {
-  border-left: 4px solid rgba(0, 60, 0, .66);
-  border-top: 4px solid transparent;
-  left: 5px;
+  right: 5px;
   top: 5px;
-  transform: rotate(-135deg);
+  border-top: 1.4px solid rgba(0, 60, 0, .70);
+  border-right: 1.4px solid rgba(0, 60, 0, .70);
+  transform: rotate(180deg);
 }
 
 .traffic-lights:hover .tl-full.is-fullscreen::after {
-  border-right: 4px solid rgba(0, 60, 0, .66);
-  border-bottom: 4px solid transparent;
-  right: 5px;
+  left: 5px;
   bottom: 5px;
-  transform: rotate(-135deg);
+  border-left: 1.4px solid rgba(0, 60, 0, .70);
+  border-bottom: 1.4px solid rgba(0, 60, 0, .70);
+  transform: rotate(180deg);
 }
 
 .brand {
