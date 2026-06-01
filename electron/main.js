@@ -4,7 +4,10 @@ const fs = require('fs');
 
 const root = path.join(__dirname, '..');
 const legacyDataDir = path.join(root, 'data');
-const fontsDir = path.join(root, 'fonts');
+const bundledFontsDir = app.isPackaged
+  ? path.join(process.resourcesPath, 'fonts')
+  : path.join(root, 'fonts');
+const userFontsDir = path.join(app.getPath('userData'), 'fonts');
 
 let dataDir;
 let todosPath;
@@ -173,7 +176,7 @@ function mergeSettings(current = {}, patch = {}) {
 
 function ensureDataFiles() {
   fs.mkdirSync(dataDir, { recursive: true });
-  fs.mkdirSync(fontsDir, { recursive: true });
+  fs.mkdirSync(userFontsDir, { recursive: true });
   fs.mkdirSync(backupDir, { recursive: true });
 
   const legacyTodosPath = path.join(legacyDataDir, 'todos.json');
@@ -610,8 +613,27 @@ function scanFontDir(dir, system = false) {
   }
 }
 
+function mergeFonts(...groups) {
+  const map = new Map();
+
+  for (const group of groups) {
+    for (const font of group) {
+      const key = `${font.name}-${font.file}-${font.system ? 'system' : 'local'}`;
+
+      if (!map.has(key)) {
+        map.set(key, font);
+      }
+    }
+  }
+
+  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
 function scanProjectFonts() {
-  return scanFontDir(fontsDir, false);
+  return mergeFonts(
+    scanFontDir(bundledFontsDir, false),
+    scanFontDir(userFontsDir, false)
+  );
 }
 
 function scanWindowsFonts() {
