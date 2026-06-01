@@ -15,7 +15,8 @@ const defaultSettings = {
   global: {
     fontFamily: 'system',
     fontSize: 14,
-    language: 'zh-CN'
+    language: 'zh-CN',
+    accentColor: '#5f8cff'
   },
   widget: {
     glassOpacity: 0.14,
@@ -71,11 +72,25 @@ function writeJsonDirect(file, value) {
   fs.writeFileSync(file, JSON.stringify(value, null, 2), 'utf8');
 }
 
+function cleanUndefined(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+
+  for (const key of Object.keys(obj)) {
+    if (obj[key] === undefined) {
+      delete obj[key];
+    } else if (obj[key] && typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
+      cleanUndefined(obj[key]);
+    }
+  }
+
+  return obj;
+}
+
 function migrateSettings(raw = {}) {
   const oldFontFamily = raw.fontFamily || raw.global?.fontFamily || raw.widget?.fontFamily || raw.panel?.fontFamily;
   const oldFontSize = raw.fontSize || raw.global?.fontSize || raw.widget?.fontSize || raw.panel?.fontSize;
 
-  return {
+  const migrated = {
     ...defaultSettings,
     ...raw,
     global: {
@@ -83,7 +98,8 @@ function migrateSettings(raw = {}) {
       ...(raw.global || {}),
       fontFamily: oldFontFamily || defaultSettings.global.fontFamily,
       fontSize: oldFontSize || defaultSettings.global.fontSize,
-      language: raw.global?.language || raw.language || defaultSettings.global.language
+      language: raw.global?.language || raw.language || defaultSettings.global.language,
+      accentColor: raw.global?.accentColor || raw.accentColor || defaultSettings.global.accentColor
     },
     widget: {
       ...defaultSettings.widget,
@@ -107,20 +123,8 @@ function migrateSettings(raw = {}) {
     },
     windowLevel: raw.windowLevel || defaultSettings.windowLevel
   };
-}
 
-function cleanUndefined(obj) {
-  if (!obj || typeof obj !== 'object') return obj;
-
-  for (const key of Object.keys(obj)) {
-    if (obj[key] === undefined) {
-      delete obj[key];
-    } else if (obj[key] && typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
-      cleanUndefined(obj[key]);
-    }
-  }
-
-  return obj;
+  return cleanUndefined(migrated);
 }
 
 function mergeSettings(current = {}, patch = {}) {
@@ -245,9 +249,9 @@ function broadcastTodos() {
 }
 
 function broadcastSettings() {
-  const settings = readJson(settingsPath, defaultSettings);
-  widgetWindow?.webContents.send('settings:changed', mergeSettings(settings));
-  panelWindow?.webContents.send('settings:changed', mergeSettings(settings));
+  const settings = mergeSettings(readJson(settingsPath, defaultSettings));
+  widgetWindow?.webContents.send('settings:changed', settings);
+  panelWindow?.webContents.send('settings:changed', settings);
 }
 
 function applyWindowLevel(settings) {
@@ -318,8 +322,8 @@ function createWindows() {
     height: wb.height || 340,
     x: Number.isFinite(wb.x) ? wb.x : 36,
     y: Number.isFinite(wb.y) ? wb.y : 80,
-    minWidth: 280,
-    minHeight: 180,
+    minWidth: 260,
+    minHeight: 160,
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',

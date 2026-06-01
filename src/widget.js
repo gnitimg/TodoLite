@@ -11,6 +11,34 @@ const ddl = document.getElementById('ddl');
 const detail = document.getElementById('detail');
 const sortBtn = document.getElementById('sortBtn');
 
+const i18n = {
+  'zh-CN': {
+    quietList: '安静列表',
+    nothingLeft: '没有剩余任务',
+    cancel: '取消',
+    save: '保存',
+    content: '内容',
+    detail: '详情，可选',
+    sortByDdl: '按 DDL 排序',
+    sortOriginal: '恢复原顺序'
+  },
+  'en-US': {
+    quietList: 'quiet list',
+    nothingLeft: 'nothing left',
+    cancel: 'cancel',
+    save: 'save',
+    content: 'content',
+    detail: 'detail, optional',
+    sortByDdl: 'Sort by DDL',
+    sortOriginal: 'Sort by original order'
+  }
+};
+
+function t(key) {
+  const lang = settings.global?.language || 'zh-CN';
+  return i18n[lang]?.[key] || i18n['zh-CN'][key] || key;
+}
+
 function toLocalInput(value) {
   return String(value || '').replace(' ', 'T');
 }
@@ -25,9 +53,60 @@ function fromLocalInput(value) {
   return v;
 }
 
-function setCssVar(target, name, value) {
-  document.documentElement.style.setProperty(name, value);
-  if (target) target.style.setProperty(name, value);
+function clamp01(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(1, n));
+}
+
+function clamp100(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, n));
+}
+
+function hexToRgb(hex) {
+  const clean = String(hex || '#5f8cff').replace('#', '');
+  const full = clean.length === 3
+    ? clean.split('').map(x => x + x).join('')
+    : clean.padEnd(6, '0').slice(0, 6);
+
+  const n = parseInt(full, 16);
+
+  return {
+    r: (n >> 16) & 255,
+    g: (n >> 8) & 255,
+    b: n & 255
+  };
+}
+
+function setSurfaceVars(target, surface, global) {
+  const opacity = clamp01(surface.glassOpacity ?? .14);
+  const blur = clamp100(surface.blurStrength ?? 36);
+  const radius = Number(surface.cornerRadius ?? 24);
+  const accent = global.accentColor || '#5f8cff';
+  const rgb = hexToRgb(accent);
+
+  const mistOpacity = Math.min(0.62, blur / 130);
+  const hazeOpacity = Math.min(0.52, blur / 155);
+  const glowSize = 120 + blur * 2.4;
+
+  const vars = {
+    '--opacity': String(opacity),
+    '--blur': `${blur}px`,
+    '--radius': `${radius}px`,
+    '--mist-opacity': String(mistOpacity),
+    '--haze-opacity': String(hazeOpacity),
+    '--glow-size': `${glowSize}px`,
+    '--accent': accent,
+    '--accent-rgb': `${rgb.r}, ${rgb.g}, ${rgb.b}`,
+    '--glass': `rgba(255,255,255,${opacity})`
+  };
+
+  for (const [key, value] of Object.entries(vars)) {
+    document.documentElement.style.setProperty(key, value);
+    target?.style.setProperty(key, value);
+  }
 }
 
 function applyGlobalSettings(global) {
@@ -45,12 +124,6 @@ function applyGlobalSettings(global) {
   document.body.style.fontSize = `${g.fontSize || 14}px`;
 }
 
-function applyWidgetGlass(ws) {
-  setCssVar(widget, '--opacity', String(ws.glassOpacity ?? .14));
-  setCssVar(widget, '--blur', `${ws.blurStrength ?? 36}px`);
-  setCssVar(widget, '--radius', `${ws.cornerRadius ?? 24}px`);
-}
-
 function applySettings(s) {
   settings = s || {};
 
@@ -58,13 +131,24 @@ function applySettings(s) {
   sortByDdl = !!ws.sortByDdl;
 
   applyGlobalSettings(settings.global || {});
-  applyWidgetGlass(ws);
+  setSurfaceVars(widget, ws, settings.global || {});
   updateSortButton();
+  applyTranslations();
+}
+
+function applyTranslations() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.dataset.i18n;
+    el.textContent = t(key);
+  });
+
+  content.placeholder = t('content');
+  detail.placeholder = t('detail');
 }
 
 function updateSortButton() {
   sortBtn.classList.toggle('active', sortByDdl);
-  sortBtn.title = sortByDdl ? 'Sort by original order' : 'Sort by DDL';
+  sortBtn.title = sortByDdl ? t('sortOriginal') : t('sortByDdl');
 }
 
 function sortItems(items) {
@@ -78,13 +162,13 @@ function render() {
   list.innerHTML = '';
 
   if (!active.length) {
-    list.innerHTML = '<div class="empty">nothing left</div>';
+    list.innerHTML = `<div class="empty">${t('nothingLeft')}</div>`;
     return;
   }
 
   for (const item of active) {
     const row = document.createElement('div');
-    row.className = 'todo';
+    row.className = 'todo no-drag';
 
     row.innerHTML = `
       <div class="check" title="done"></div>

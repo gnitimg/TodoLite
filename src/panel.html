@@ -6,7 +6,7 @@
   <link rel="stylesheet" href="panel.css" />
 </head>
 <body>
-  <main class="panel glass">
+  <main class="panel glass drag">
     <aside class="side drag">
       <div class="traffic-lights no-drag">
         <button class="tl-btn tl-close" id="tlClose" title="close"></button>
@@ -16,56 +16,56 @@
 
       <div class="brand">TodoLite</div>
 
-      <button class="nav active no-drag" data-page="tasks">Tasks</button>
-      <button class="nav no-drag" data-page="settings">Settings</button>
+      <button class="nav active no-drag" data-page="tasks" data-i18n="tasks">任务</button>
+      <button class="nav no-drag" data-page="settings" data-i18n="settings">设置</button>
 
       <div class="spacer"></div>
     </aside>
 
-    <section class="page no-drag" id="tasksPage">
+    <section class="page drag" id="tasksPage">
       <div class="topbar drag">
         <div>
-          <h1>Tasks</h1>
-          <p>visible, exact, retained</p>
+          <h1 data-i18n="tasks">任务</h1>
+          <p data-i18n="subtitle">清晰、精确、保留</p>
         </div>
         <button id="newBtn" class="primary no-drag">+</button>
       </div>
 
-      <div id="activeList" class="block"></div>
-      <div id="completedList" class="block completed-block"></div>
+      <div id="activeList" class="block no-drag"></div>
+      <div id="completedList" class="block completed-block no-drag"></div>
     </section>
 
-    <section class="page no-drag hidden" id="settingsPage">
+    <section class="page drag hidden" id="settingsPage">
       <div class="topbar drag">
         <div>
-          <h1>Settings</h1>
-          <p>global first, then surfaces</p>
+          <h1 data-i18n="settings">设置</h1>
+          <p data-i18n="settingsSubtitle">全局优先，然后调整每一块玻璃</p>
         </div>
       </div>
 
-      <div class="settings-columns">
+      <div class="settings-columns no-drag">
         <div class="settings-col">
-          <div class="col-title">Global</div>
+          <div class="col-title" data-i18n="global">全局</div>
 
           <div class="settings-grid">
             <label>
-              Font
+              <span data-i18n="font">字体</span>
               <div class="liquid-select font-select no-drag" id="globalFontDropdown">
                 <button class="liquid-select-trigger" id="globalFontSelected" type="button">system</button>
                 <div class="liquid-select-menu">
-                  <input class="liquid-search" id="globalFontSearch" placeholder="search..." autocomplete="off" />
+                  <input class="liquid-search" id="globalFontSearch" placeholder="搜索..." autocomplete="off" />
                   <div class="liquid-options" id="globalFontList"></div>
                 </div>
               </div>
             </label>
 
             <label>
-              Font size
+              <span data-i18n="fontSize">字号</span>
               <input id="globalFontSize" type="range" min="11" max="22" step="1">
             </label>
 
             <label>
-              Language
+              <span data-i18n="language">语言</span>
               <div class="liquid-select no-drag" id="languageDropdown">
                 <button class="liquid-select-trigger" id="languageSelected" type="button">简体中文</button>
                 <div class="liquid-select-menu">
@@ -73,51 +73,59 @@
                 </div>
               </div>
             </label>
-          </div>
-        </div>
-
-        <div class="settings-col">
-          <div class="col-title">Widget</div>
-
-          <div class="settings-grid">
-            <label>
-              Opacity
-              <input id="widgetGlassOpacity" type="range" min="0.06" max="0.60" step="0.01">
-            </label>
 
             <label>
-              Blur
-              <input id="widgetBlurStrength" type="range" min="0" max="64" step="1">
-            </label>
-
-            <label>
-              Radius
-              <input id="widgetCornerRadius" type="range" min="10" max="42" step="1">
+              <span data-i18n="accentColor">主题色</span>
+              <button type="button" class="accent-trigger no-drag" id="accentTrigger">
+                <span class="accent-dot" id="accentDot"></span>
+                <span id="accentText">#5f8cff</span>
+              </button>
             </label>
           </div>
         </div>
 
         <div class="settings-col">
-          <div class="col-title">Panel</div>
+          <div class="col-title" data-i18n="widget">小窗口</div>
 
           <div class="settings-grid">
             <label>
-              Opacity
-              <input id="panelGlassOpacity" type="range" min="0.06" max="0.70" step="0.01">
+              <span data-i18n="opacity">透明度</span>
+              <input id="widgetGlassOpacity" type="range" min="0" max="1" step="0.01">
             </label>
 
             <label>
-              Blur
-              <input id="panelBlurStrength" type="range" min="0" max="64" step="1">
+              <span data-i18n="blur">雾化</span>
+              <input id="widgetBlurStrength" type="range" min="0" max="100" step="1">
             </label>
 
             <label>
-              Radius
-              <input id="panelCornerRadius" type="range" min="10" max="42" step="1">
+              <span data-i18n="radius">圆角</span>
+              <input id="widgetCornerRadius" type="range" min="0" max="48" step="1">
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-col">
+          <div class="col-title" data-i18n="panel">主面板</div>
+
+          <div class="settings-grid">
+            <label>
+              <span data-i18n="opacity">透明度</span>
+              <input id="panelGlassOpacity" type="range" min="0" max="1" step="0.01">
             </label>
 
             <label>
-              Layer
+              <span data-i18n="blur">雾化</span>
+              <input id="panelBlurStrength" type="range" min="0" max="100" step="1">
+            </label>
+
+            <label>
+              <span data-i18n="radius">圆角</span>
+              <input id="panelCornerRadius" type="range" min="0" max="48" step="1">
+            </label>
+
+            <label>
+              <span data-i18n="layer">层级</span>
               <div class="liquid-select no-drag" id="windowLevelDropdown">
                 <button class="liquid-select-trigger" id="windowLevelSelected" type="button">desktop</button>
                 <div class="liquid-select-menu">
@@ -129,24 +137,37 @@
         </div>
       </div>
 
-      <div class="data-actions">
-        <button id="openData">open data</button>
-        <button id="openBackups">open backups</button>
+      <div class="data-actions no-drag">
+        <button id="openData" data-i18n="openData">打开数据</button>
+        <button id="openBackups" data-i18n="openBackups">打开备份</button>
       </div>
     </section>
   </main>
 
   <dialog id="editor" class="glass no-drag">
     <form method="dialog" id="form">
-      <input id="content" placeholder="content" autocomplete="off" />
+      <input id="content" placeholder="内容" autocomplete="off" />
       <input id="ddl" type="datetime-local" step="1" />
-      <textarea id="detail" placeholder="detail, optional"></textarea>
+      <textarea id="detail" placeholder="详情，可选"></textarea>
 
       <div class="dialog-actions">
-        <button value="cancel" type="button" id="deleteBtn" class="danger">remove</button>
+        <button value="cancel" type="button" id="deleteBtn" class="danger" data-i18n="remove">移除</button>
         <div class="grow"></div>
-        <button value="cancel" type="button" id="cancelBtn">cancel</button>
-        <button value="ok" type="submit">save</button>
+        <button value="cancel" type="button" id="cancelBtn" data-i18n="cancel">取消</button>
+        <button value="ok" type="submit" data-i18n="save">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="accentDialog" class="glass accent-dialog no-drag">
+    <form method="dialog" id="accentForm">
+      <div class="dialog-title" data-i18n="accentColor">主题色</div>
+      <input id="accentPicker" class="accent-picker" type="color" value="#5f8cff" />
+      <div class="accent-presets" id="accentPresets"></div>
+      <div class="dialog-actions">
+        <div class="grow"></div>
+        <button value="cancel" type="button" id="accentCancel" data-i18n="cancel">取消</button>
+        <button value="ok" type="submit" data-i18n="save">保存</button>
       </div>
     </form>
   </dialog>
