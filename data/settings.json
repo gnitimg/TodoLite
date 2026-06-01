@@ -1,0 +1,17 @@
+{
+  "widget": {
+    "fontFamily": "system",
+    "fontSize": 14,
+    "glassOpacity": 0.14,
+    "blurStrength": 36,
+    "cornerRadius": 24
+  },
+  "panel": {
+    "fontFamily": "system",
+    "fontSize": 14,
+    "glassOpacity": 0.20,
+    "blurStrength": 18,
+    "cornerRadius": 22
+  },
+  "windowLevel": "desktop"
+}

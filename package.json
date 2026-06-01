@@ -1,0 +1,16 @@
+{
+  "name": "todolite",
+  "version": "0.1.0",
+  "description": "A minimal Windows liquid-glass desktop todo layer.",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "electron .",
+    "start": "electron ."
+  },
+  "keywords": ["todo", "electron", "desktop", "minimal"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^39.2.7"
+  }
+}

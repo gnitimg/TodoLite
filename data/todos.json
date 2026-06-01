@@ -1,0 +1,12 @@
+{
+  "active": [
+    {
+      "id": "sample-1",
+      "content": "Complete TodoLite MVP",
+      "ddl": "2026-06-03 23:59:00",
+      "detail": "Desktop widget with embedded glass, panel with traffic lights."
+    }
+  ],
+  "completed": {},
+  "removed": []
+}
