@@ -7,15 +7,34 @@ contextBridge.exposeInMainWorld('todoLite', {
   completeTodo: id => ipcRenderer.invoke('todos:complete', id),
   restoreTodo: id => ipcRenderer.invoke('todos:restore', id),
   removeTodo: id => ipcRenderer.invoke('todos:remove', id),
+
   getSettings: () => ipcRenderer.invoke('settings:get'),
   updateSettings: patch => ipcRenderer.invoke('settings:update', patch),
+
   listFonts: () => ipcRenderer.invoke('fonts:list'),
+
   openDataFolder: () => ipcRenderer.invoke('folder:open-data'),
   openBackupFolder: () => ipcRenderer.invoke('folder:open-backups'),
+
   closePanel: () => ipcRenderer.invoke('app:close-panel'),
   minimizePanel: () => ipcRenderer.invoke('app:minimize-panel'),
   fullscreenPanel: () => ipcRenderer.invoke('app:fullscreen-panel'),
+  getPanelFullscreenState: () => ipcRenderer.invoke('app:panel-fullscreen-state'),
+
   quit: () => ipcRenderer.invoke('app:quit'),
-  onTodosChanged: cb => ipcRenderer.on('todos:changed', (_, data) => cb(data)),
-  onSettingsChanged: cb => ipcRenderer.on('settings:changed', (_, data) => cb(data))
+
+  onTodosChanged: cb => {
+    ipcRenderer.removeAllListeners('todos:changed');
+    ipcRenderer.on('todos:changed', (_, data) => cb(data));
+  },
+
+  onSettingsChanged: cb => {
+    ipcRenderer.removeAllListeners('settings:changed');
+    ipcRenderer.on('settings:changed', (_, data) => cb(data));
+  },
+
+  onPanelFullscreenChanged: cb => {
+    ipcRenderer.removeAllListeners('panel:fullscreen-changed');
+    ipcRenderer.on('panel:fullscreen-changed', (_, value) => cb(value));
+  }
 });
