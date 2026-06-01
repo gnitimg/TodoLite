@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -15,13 +15,16 @@ const defaultSettings = {
   global: {
     fontFamily: 'system',
     fontSize: 14,
-    language: 'zh-CN'
+    language: 'zh-CN',
+    accentColor: '#5f8cff',
+    startup: false
   },
   widget: {
     glassOpacity: 0.14,
     blurStrength: 36,
     cornerRadius: 24,
     sortByDdl: false,
+    layer: 'desktop',
     bounds: {
       width: 430,
       height: 340,
@@ -37,8 +40,7 @@ const defaultSettings = {
       width: 780,
       height: 640
     }
-  },
-  windowLevel: 'desktop'
+  }
 };
 
 let widgetWindow;
@@ -46,6 +48,9 @@ let panelWindow;
 let tray;
 let widgetBoundsTimer = null;
 let panelBoundsTimer = null;
+let panelZoomed = false;
+let panelRestoreBounds = null;
+let panelAnimating = false;
 
 function resolvePaths() {
   dataDir = path.join(app.getPath('userData'), 'data');
@@ -71,11 +76,26 @@ function writeJsonDirect(file, value) {
   fs.writeFileSync(file, JSON.stringify(value, null, 2), 'utf8');
 }
 
+function cleanUndefined(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+
+  for (const key of Object.keys(obj)) {
+    if (obj[key] === undefined) {
+      delete obj[key];
+    } else if (obj[key] && typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
+      cleanUndefined(obj[key]);
+    }
+  }
+
+  return obj;
+}
+
 function migrateSettings(raw = {}) {
   const oldFontFamily = raw.fontFamily || raw.global?.fontFamily || raw.widget?.fontFamily || raw.panel?.fontFamily;
   const oldFontSize = raw.fontSize || raw.global?.fontSize || raw.widget?.fontSize || raw.panel?.fontSize;
+  const oldWindowLevel = raw.windowLevel || raw.widget?.layer || defaultSettings.widget.layer;
 
-  return {
+  const migrated = {
     ...defaultSettings,
     ...raw,
     global: {
@@ -83,13 +103,16 @@ function migrateSettings(raw = {}) {
       ...(raw.global || {}),
       fontFamily: oldFontFamily || defaultSettings.global.fontFamily,
       fontSize: oldFontSize || defaultSettings.global.fontSize,
-      language: raw.global?.language || raw.language || defaultSettings.global.language
+      language: raw.global?.language || raw.language || defaultSettings.global.language,
+      accentColor: raw.global?.accentColor || raw.accentColor || defaultSettings.global.accentColor,
+      startup: Boolean(raw.global?.startup ?? raw.startup ?? defaultSettings.global.startup)
     },
     widget: {
       ...defaultSettings.widget,
       ...(raw.widget || {}),
       fontFamily: undefined,
       fontSize: undefined,
+      layer: raw.widget?.layer || oldWindowLevel,
       bounds: {
         ...defaultSettings.widget.bounds,
         ...((raw.widget || {}).bounds || {})
@@ -105,22 +128,10 @@ function migrateSettings(raw = {}) {
         ...((raw.panel || {}).bounds || {})
       }
     },
-    windowLevel: raw.windowLevel || defaultSettings.windowLevel
+    windowLevel: undefined
   };
-}
 
-function cleanUndefined(obj) {
-  if (!obj || typeof obj !== 'object') return obj;
-
-  for (const key of Object.keys(obj)) {
-    if (obj[key] === undefined) {
-      delete obj[key];
-    } else if (obj[key] && typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
-      cleanUndefined(obj[key]);
-    }
-  }
-
-  return obj;
+  return cleanUndefined(migrated);
 }
 
 function mergeSettings(current = {}, patch = {}) {
@@ -154,7 +165,7 @@ function mergeSettings(current = {}, patch = {}) {
         ...((patch.panel || {}).bounds || {})
       }
     },
-    windowLevel: patch.windowLevel ?? base.windowLevel ?? defaultSettings.windowLevel
+    windowLevel: undefined
   };
 
   return cleanUndefined(merged);
@@ -245,33 +256,68 @@ function broadcastTodos() {
 }
 
 function broadcastSettings() {
-  const settings = readJson(settingsPath, defaultSettings);
-  widgetWindow?.webContents.send('settings:changed', mergeSettings(settings));
-  panelWindow?.webContents.send('settings:changed', mergeSettings(settings));
+  const settings = mergeSettings(readJson(settingsPath, defaultSettings));
+  widgetWindow?.webContents.send('settings:changed', settings);
+  panelWindow?.webContents.send('settings:changed', settings);
 }
 
-function applyWindowLevel(settings) {
-  const level = settings.windowLevel || 'desktop';
+function applyStartup(enabled) {
+  try {
+    app.setLoginItemSettings({
+      openAtLogin: Boolean(enabled),
+      openAsHidden: false,
+      path: process.execPath
+    });
+  } catch {
+    // Dev / portable environments may fail silently.
+  }
+}
 
-  if (widgetWindow) {
-    widgetWindow.setSkipTaskbar(true);
+function getStartupStateFromSystem() {
+  try {
+    return Boolean(app.getLoginItemSettings().openAtLogin);
+  } catch {
+    return false;
+  }
+}
 
-    if (level === 'topmost') {
-      widgetWindow.setAlwaysOnTop(true, 'screen-saver');
-    } else {
-      widgetWindow.setAlwaysOnTop(false);
-    }
+function getWidgetLayer() {
+  const settings = mergeSettings(readJson(settingsPath, defaultSettings));
+  return settings.widget?.layer || 'desktop';
+}
+
+function applyWidgetLayer(settings) {
+  const layer = settings.widget?.layer || 'desktop';
+
+  if (!widgetWindow) return;
+
+  widgetWindow.setSkipTaskbar(true);
+
+  if (layer === 'topmost') {
+    widgetWindow.setFocusable(true);
+    widgetWindow.setAlwaysOnTop(true, 'screen-saver');
+    widgetWindow.show();
+    return;
   }
 
-  if (panelWindow) {
-    if (level === 'topmost') {
-      panelWindow.setAlwaysOnTop(true, 'screen-saver');
-    } else {
-      panelWindow.setAlwaysOnTop(false);
-    }
+  widgetWindow.setAlwaysOnTop(false);
 
-    panelWindow.setSkipTaskbar(level === 'desktop');
+  if (layer === 'normal') {
+    widgetWindow.setFocusable(true);
+    widgetWindow.show();
+    return;
   }
+
+  // desktop: 最低干扰层，只控制小 Todo。
+  // 纯 Electron 无法稳定挂到 WorkerW 桌面层，这里尽量避免抢焦点和任务栏出现。
+  widgetWindow.setFocusable(false);
+  widgetWindow.showInactive();
+
+  setTimeout(() => {
+    if (!widgetWindow || widgetWindow.isDestroyed()) return;
+    widgetWindow.setFocusable(true);
+    widgetWindow.blur();
+  }, 260);
 }
 
 function saveBounds(kind) {
@@ -306,6 +352,79 @@ function debounceSaveBounds(kind) {
   }
 }
 
+function easeOutCubic(t) {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+function animateWindowBounds(win, target, duration = 260, done) {
+  if (!win || win.isDestroyed() || panelAnimating) return;
+
+  panelAnimating = true;
+
+  const from = win.getBounds();
+  const start = Date.now();
+
+  const tick = () => {
+    if (!win || win.isDestroyed()) {
+      panelAnimating = false;
+      return;
+    }
+
+    const p = Math.min(1, (Date.now() - start) / duration);
+    const e = easeOutCubic(p);
+
+    const next = {
+      x: Math.round(from.x + (target.x - from.x) * e),
+      y: Math.round(from.y + (target.y - from.y) * e),
+      width: Math.round(from.width + (target.width - from.width) * e),
+      height: Math.round(from.height + (target.height - from.height) * e)
+    };
+
+    win.setBounds(next, false);
+
+    if (p < 1) {
+      setTimeout(tick, 1000 / 60);
+    } else {
+      panelAnimating = false;
+      if (typeof done === 'function') done();
+    }
+  };
+
+  tick();
+}
+
+function getPanelZoomTarget() {
+  const display = screen.getDisplayMatching(panelWindow.getBounds());
+  const area = display.workArea;
+
+  return {
+    x: area.x + 10,
+    y: area.y + 10,
+    width: area.width - 20,
+    height: area.height - 20
+  };
+}
+
+function showPanel() {
+  if (!panelWindow) return;
+
+  panelWindow.setSkipTaskbar(false);
+  panelWindow.show();
+  panelWindow.focus();
+}
+
+function hidePanel() {
+  if (!panelWindow) return;
+
+  panelWindow.hide();
+  panelWindow.setSkipTaskbar(true);
+}
+
+function togglePanel() {
+  if (!panelWindow) return;
+  panelWindow.isVisible() ? hidePanel() : showPanel();
+}
+
 function createWindows() {
   const settings = mergeSettings(readJson(settingsPath, defaultSettings));
   const ws = settings.widget || defaultSettings.widget;
@@ -318,14 +437,14 @@ function createWindows() {
     height: wb.height || 340,
     x: Number.isFinite(wb.x) ? wb.x : 36,
     y: Number.isFinite(wb.y) ? wb.y : 80,
-    minWidth: 280,
-    minHeight: 180,
+    minWidth: 260,
+    minHeight: 160,
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
     resizable: true,
     hasShadow: false,
-    show: true,
+    show: false,
     skipTaskbar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -335,8 +454,34 @@ function createWindows() {
   });
 
   widgetWindow.loadFile(path.join(root, 'src', 'widget.html'));
+
+  widgetWindow.once('ready-to-show', () => {
+    applyWidgetLayer(settings);
+  });
+
   widgetWindow.on('moved', () => debounceSaveBounds('widget'));
   widgetWindow.on('resized', () => debounceSaveBounds('widget'));
+
+  widgetWindow.on('minimize', event => {
+    if (getWidgetLayer() === 'desktop') {
+      event.preventDefault();
+      setTimeout(() => {
+        if (!widgetWindow || widgetWindow.isDestroyed()) return;
+        widgetWindow.showInactive();
+        widgetWindow.blur();
+      }, 80);
+    }
+  });
+
+  widgetWindow.on('hide', () => {
+    if (getWidgetLayer() === 'desktop' && !app.isQuiting) {
+      setTimeout(() => {
+        if (!widgetWindow || widgetWindow.isDestroyed()) return;
+        widgetWindow.showInactive();
+        widgetWindow.blur();
+      }, 120);
+    }
+  });
 
   panelWindow = new BrowserWindow({
     width: pb.width || 780,
@@ -349,6 +494,7 @@ function createWindows() {
     resizable: true,
     hasShadow: true,
     show: false,
+    skipTaskbar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -364,19 +510,9 @@ function createWindows() {
   panelWindow.on('close', event => {
     if (!app.isQuiting) {
       event.preventDefault();
-      panelWindow.hide();
+      hidePanel();
     }
   });
-
-  panelWindow.on('maximize', () => {
-    panelWindow?.webContents.send('panel:maximize-changed', true);
-  });
-
-  panelWindow.on('unmaximize', () => {
-    panelWindow?.webContents.send('panel:maximize-changed', false);
-  });
-
-  applyWindowLevel(settings);
 }
 
 function createTray() {
@@ -397,7 +533,7 @@ function createTray() {
     { label: 'Open TodoLite', click: showPanel },
     {
       label: 'Show / Hide Desktop Layer',
-      click: () => widgetWindow?.isVisible() ? widgetWindow.hide() : widgetWindow.show()
+      click: () => widgetWindow?.isVisible() ? widgetWindow.hide() : widgetWindow.showInactive()
     },
     { type: 'separator' },
     {
@@ -408,17 +544,6 @@ function createTray() {
       }
     }
   ]));
-}
-
-function showPanel() {
-  if (!panelWindow) return;
-  panelWindow.show();
-  panelWindow.focus();
-}
-
-function togglePanel() {
-  if (!panelWindow) return;
-  panelWindow.isVisible() ? panelWindow.hide() : showPanel();
 }
 
 function scanProjectFonts() {
@@ -438,7 +563,11 @@ function scanProjectFonts() {
 }
 
 ipcMain.handle('todos:get', () => readJson(todosPath, baseTodoData()));
-ipcMain.handle('settings:get', () => mergeSettings(readJson(settingsPath, defaultSettings)));
+ipcMain.handle('settings:get', () => {
+  const settings = mergeSettings(readJson(settingsPath, defaultSettings));
+  settings.global.startup = getStartupStateFromSystem();
+  return settings;
+});
 ipcMain.handle('fonts:list', () => ({ project: scanProjectFonts(), system: [] }));
 
 ipcMain.handle('todos:add', (_, todo) => {
@@ -568,7 +697,8 @@ ipcMain.handle('settings:update', (_, patch) => {
   const settings = mergeSettings(current, patch || {});
 
   atomicWriteJson(settingsPath, settings, false);
-  applyWindowLevel(settings);
+  applyStartup(settings.global?.startup);
+  applyWidgetLayer(settings);
   broadcastSettings();
 
   return settings;
@@ -576,26 +706,31 @@ ipcMain.handle('settings:update', (_, patch) => {
 
 ipcMain.handle('folder:open-data', () => shell.openPath(dataDir));
 ipcMain.handle('folder:open-backups', () => shell.openPath(backupDir));
-ipcMain.handle('app:close-panel', () => panelWindow?.hide());
+ipcMain.handle('app:close-panel', () => hidePanel());
 ipcMain.handle('app:minimize-panel', () => panelWindow?.minimize());
 
 ipcMain.handle('app:fullscreen-panel', () => {
-  if (!panelWindow) return false;
+  if (!panelWindow || panelAnimating) return panelZoomed;
 
-  if (panelWindow.isMaximized()) {
-    panelWindow.unmaximize();
+  if (panelZoomed) {
+    const target = panelRestoreBounds || mergeSettings(readJson(settingsPath, defaultSettings)).panel.bounds;
+    panelZoomed = false;
     panelWindow.webContents.send('panel:maximize-changed', false);
+    animateWindowBounds(panelWindow, target, 260, () => debounceSaveBounds('panel'));
     return false;
   }
 
-  panelWindow.maximize();
+  panelRestoreBounds = panelWindow.getBounds();
+  const target = getPanelZoomTarget();
+
+  panelZoomed = true;
   panelWindow.webContents.send('panel:maximize-changed', true);
+  animateWindowBounds(panelWindow, target, 260);
+
   return true;
 });
 
-ipcMain.handle('app:panel-fullscreen-state', () => {
-  return panelWindow?.isMaximized() || false;
-});
+ipcMain.handle('app:panel-fullscreen-state', () => panelZoomed);
 
 ipcMain.handle('app:quit', () => {
   app.isQuiting = true;
@@ -605,6 +740,10 @@ ipcMain.handle('app:quit', () => {
 app.whenReady().then(() => {
   resolvePaths();
   ensureDataFiles();
+
+  const settings = mergeSettings(readJson(settingsPath, defaultSettings));
+  applyStartup(settings.global?.startup);
+
   createWindows();
   createTray();
 });

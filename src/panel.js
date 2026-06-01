@@ -14,16 +14,114 @@ const detail = document.getElementById('detail');
 const deleteBtn = document.getElementById('deleteBtn');
 const tlFull = document.getElementById('tlFull');
 
+const accentDialog = document.getElementById('accentDialog');
+const accentForm = document.getElementById('accentForm');
+const accentTrigger = document.getElementById('accentTrigger');
+const accentPicker = document.getElementById('accentPicker');
+const accentDot = document.getElementById('accentDot');
+const accentText = document.getElementById('accentText');
+const accentPresets = document.getElementById('accentPresets');
+
+const startupToggle = document.getElementById('startupToggle');
+const startupText = document.getElementById('startupText');
+
+const accentPresetValues = [
+  '#5f8cff',
+  '#8b5cf6',
+  '#06b6d4',
+  '#22c55e',
+  '#f97316',
+  '#ef4444',
+  '#ec4899',
+  '#111827'
+];
+
+const i18n = {
+  'zh-CN': {
+    tasks: '任务',
+    settings: '设置',
+    subtitle: '清晰、精确、保留',
+    settingsSubtitle: '全局优先，然后调整每一块玻璃',
+    active: '未完成',
+    completedByDate: '按完成日期记录',
+    nothingActive: '没有未完成任务',
+    noCompleted: '没有完成记录',
+    global: '全局',
+    widget: '小窗口',
+    panel: '主面板',
+    font: '字体',
+    fontSize: '字号',
+    language: '语言',
+    accentColor: '主题色',
+    startup: '开机启动',
+    on: '开启',
+    off: '关闭',
+    opacity: '透明度',
+    blur: '雾化',
+    radius: '圆角',
+    layer: '小窗口层级',
+    openData: '打开数据',
+    openBackups: '打开备份',
+    remove: '移除',
+    cancel: '取消',
+    save: '保存',
+    content: '内容',
+    detail: '详情，可选',
+    search: '搜索...',
+    noMatch: '没有匹配',
+    putFonts: '将 .ttf / .otf / .woff 放入 fonts 文件夹'
+  },
+  'en-US': {
+    tasks: 'Tasks',
+    settings: 'Settings',
+    subtitle: 'visible, exact, retained',
+    settingsSubtitle: 'global first, then surfaces',
+    active: 'active',
+    completedByDate: 'completed by date',
+    nothingActive: 'nothing active',
+    noCompleted: 'no completed record',
+    global: 'Global',
+    widget: 'Widget',
+    panel: 'Panel',
+    font: 'Font',
+    fontSize: 'Font size',
+    language: 'Language',
+    accentColor: 'Accent color',
+    startup: 'Launch at startup',
+    on: 'On',
+    off: 'Off',
+    opacity: 'Opacity',
+    blur: 'Haze',
+    radius: 'Radius',
+    layer: 'Widget layer',
+    openData: 'open data',
+    openBackups: 'open backups',
+    remove: 'remove',
+    cancel: 'cancel',
+    save: 'save',
+    content: 'content',
+    detail: 'detail, optional',
+    search: 'search...',
+    noMatch: 'no match',
+    putFonts: 'put .ttf / .otf / .woff in fonts'
+  }
+};
+
 const languageOptions = [
   { value: 'zh-CN', label: '简体中文' },
   { value: 'en-US', label: 'English' }
 ];
 
-const windowLevelOptions = [
+const widgetLayerOptions = [
   { value: 'desktop', label: 'desktop' },
   { value: 'normal', label: 'normal' },
   { value: 'topmost', label: 'topmost' }
 ];
+
+function t(key) {
+  const lang = settings.global?.language || 'zh-CN';
+  return i18n[lang]?.[key] || i18n['zh-CN'][key] || key;
+}
 
 function toLocalInput(value) {
   return String(value || '').replace(' ', 'T');
@@ -39,9 +137,60 @@ function fromLocalInput(value) {
   return v;
 }
 
-function setCssVar(target, name, value) {
-  document.documentElement.style.setProperty(name, value);
-  if (target) target.style.setProperty(name, value);
+function clamp01(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(1, n));
+}
+
+function clamp100(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, n));
+}
+
+function hexToRgb(hex) {
+  const clean = String(hex || '#5f8cff').replace('#', '');
+  const full = clean.length === 3
+    ? clean.split('').map(x => x + x).join('')
+    : clean.padEnd(6, '0').slice(0, 6);
+
+  const n = parseInt(full, 16);
+
+  return {
+    r: (n >> 16) & 255,
+    g: (n >> 8) & 255,
+    b: n & 255
+  };
+}
+
+function setSurfaceVars(target, surface, global) {
+  const opacity = clamp01(surface.glassOpacity ?? .2);
+  const blur = clamp100(surface.blurStrength ?? 18);
+  const radius = Number(surface.cornerRadius ?? 22);
+  const accent = global.accentColor || '#5f8cff';
+  const rgb = hexToRgb(accent);
+
+  const mistOpacity = Math.min(0.62, blur / 130);
+  const hazeOpacity = Math.min(0.52, blur / 155);
+  const glowSize = 120 + blur * 2.4;
+
+  const vars = {
+    '--opacity': String(opacity),
+    '--blur': `${blur}px`,
+    '--radius': `${radius}px`,
+    '--mist-opacity': String(mistOpacity),
+    '--haze-opacity': String(hazeOpacity),
+    '--glow-size': `${glowSize}px`,
+    '--accent': accent,
+    '--accent-rgb': `${rgb.r}, ${rgb.g}, ${rgb.b}`,
+    '--glass': `rgba(255,255,255,${opacity})`
+  };
+
+  for (const [key, value] of Object.entries(vars)) {
+    document.documentElement.style.setProperty(key, value);
+    target?.style.setProperty(key, value);
+  }
 }
 
 function applyGlobalSettings(global) {
@@ -59,18 +208,26 @@ function applyGlobalSettings(global) {
   document.body.style.fontSize = `${g.fontSize || 14}px`;
 }
 
-function applyPanelGlass(ps) {
-  setCssVar(panel, '--opacity', String(ps.glassOpacity ?? .20));
-  setCssVar(panel, '--blur', `${ps.blurStrength ?? 18}px`);
-  setCssVar(panel, '--radius', `${ps.cornerRadius ?? 22}px`);
-}
-
 function applySettings(s) {
   settings = s || {};
 
   applyGlobalSettings(settings.global || {});
-  applyPanelGlass(settings.panel || {});
+  setSurfaceVars(panel, settings.panel || {}, settings.global || {});
   syncSettingsUI();
+  applyTranslations();
+}
+
+function applyTranslations() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.dataset.i18n;
+    el.textContent = t(key);
+  });
+
+  content.placeholder = t('content');
+  detail.placeholder = t('detail');
+
+  const search = document.getElementById('globalFontSearch');
+  if (search) search.placeholder = t('search');
 }
 
 function syncSettingsUI() {
@@ -88,7 +245,9 @@ function syncSettingsUI() {
 
   updateFontSelected();
   updateLanguageSelected();
-  updateWindowLevelSelected();
+  updateWidgetLayerSelected();
+  updateAccentSelected();
+  updateStartupSelected();
 }
 
 function setVal(id, val) {
@@ -113,10 +272,30 @@ function updateLanguageSelected() {
   document.getElementById('languageSelected').textContent = option.label;
 }
 
-function updateWindowLevelSelected() {
-  const value = settings.windowLevel || 'desktop';
-  const option = windowLevelOptions.find(item => item.value === value) || windowLevelOptions[0];
+function updateWidgetLayerSelected() {
+  const value = settings.widget?.layer || 'desktop';
+  const option = widgetLayerOptions.find(item => item.value === value) || widgetLayerOptions[0];
   document.getElementById('windowLevelSelected').textContent = option.label;
+}
+
+function updateAccentSelected() {
+  if (!accentDot || !accentText || !accentPicker) return;
+
+  const color = settings.global?.accentColor || '#5f8cff';
+
+  accentDot.style.background = color;
+  accentText.textContent = color;
+  accentPicker.value = color;
+}
+
+function updateStartupSelected() {
+  if (!startupToggle || !startupText) return;
+
+  const enabled = Boolean(settings.global?.startup);
+
+  startupToggle.classList.toggle('active', enabled);
+  startupToggle.setAttribute('aria-pressed', String(enabled));
+  startupText.textContent = enabled ? t('on') : t('off');
 }
 
 function injectProjectFonts(list) {
@@ -222,14 +401,14 @@ function buildFontList(filter) {
   if (!projectFiltered.length && f) {
     const empty = document.createElement('div');
     empty.className = 'liquid-empty';
-    empty.textContent = 'no match';
+    empty.textContent = t('noMatch');
     list.appendChild(empty);
   }
 
   if (!projectFiltered.length && !f) {
     const empty = document.createElement('div');
     empty.className = 'liquid-empty';
-    empty.textContent = 'put .ttf / .otf / .woff in fonts';
+    empty.textContent = t('putFonts');
     list.appendChild(empty);
   }
 }
@@ -264,7 +443,7 @@ function initFontDropdown() {
 
 function makeTask(item, done = false) {
   const row = document.createElement('div');
-  row.className = `task ${done ? 'done' : ''}`;
+  row.className = `task no-drag ${done ? 'done' : ''}`;
 
   row.innerHTML = `
     <div class="check"></div>
@@ -293,25 +472,25 @@ function makeTask(item, done = false) {
 function render() {
   const active = [...(todos.active || [])].sort((a, b) => String(a.ddl).localeCompare(String(b.ddl)));
 
-  activeList.innerHTML = '<div class="section-title">active</div>';
+  activeList.innerHTML = `<div class="section-title">${t('active')}</div>`;
 
   if (!active.length) {
-    activeList.innerHTML += '<div class="empty">nothing active</div>';
+    activeList.innerHTML += `<div class="empty">${t('nothingActive')}</div>`;
   } else {
     active.forEach(item => activeList.appendChild(makeTask(item, false)));
   }
 
-  completedList.innerHTML = '<div class="section-title">completed by date</div>';
+  completedList.innerHTML = `<div class="section-title">${t('completedByDate')}</div>`;
 
   const keys = Object.keys(todos.completed || {}).sort().reverse();
 
   if (!keys.length) {
-    completedList.innerHTML += '<div class="empty">no completed record</div>';
+    completedList.innerHTML += `<div class="empty">${t('noCompleted')}</div>`;
   }
 
   for (const key of keys) {
     const card = document.createElement('div');
-    card.className = 'date-card';
+    card.className = 'date-card no-drag';
 
     const title = document.createElement('div');
     title.className = 'date-title';
@@ -354,6 +533,83 @@ function updateLiquidSpot(event) {
 
   panel.style.setProperty('--spot-x', `${x}%`);
   panel.style.setProperty('--spot-y', `${y}%`);
+}
+
+function bindGlowLifecycle(surface) {
+  if (!surface) return;
+
+  surface.classList.add('is-idle');
+  surface.classList.remove('is-lit');
+
+  const lightOn = () => {
+    surface.classList.remove('is-idle');
+    surface.classList.add('is-lit');
+  };
+
+  const lightOff = () => {
+    surface.classList.remove('is-lit');
+    surface.classList.add('is-idle');
+  };
+
+  surface.addEventListener('mouseenter', lightOn);
+  surface.addEventListener('pointerenter', lightOn);
+  surface.addEventListener('mouseleave', lightOff);
+  surface.addEventListener('pointerleave', lightOff);
+}
+
+function initAccentPicker() {
+  if (!accentTrigger || !accentDialog || !accentForm) return;
+
+  accentPresets.innerHTML = '';
+
+  for (const color of accentPresetValues) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'accent-preset';
+    btn.style.background = color;
+    btn.onclick = () => {
+      accentPicker.value = color;
+    };
+    accentPresets.appendChild(btn);
+  }
+
+  accentTrigger.onclick = () => {
+    accentPicker.value = settings.global?.accentColor || '#5f8cff';
+    accentDialog.showModal();
+  };
+
+  document.getElementById('accentCancel').onclick = () => {
+    accentDialog.close();
+  };
+
+  accentForm.onsubmit = async event => {
+    event.preventDefault();
+
+    const next = await window.todoLite.updateSettings({
+      global: {
+        accentColor: accentPicker.value
+      }
+    });
+
+    applySettings(next);
+    accentDialog.close();
+  };
+}
+
+function initStartupToggle() {
+  if (!startupToggle) return;
+
+  startupToggle.onclick = async () => {
+    const current = Boolean(settings.global?.startup);
+
+    const next = await window.todoLite.updateSettings({
+      global: {
+        startup: !current
+      }
+    });
+
+    applySettings(next);
+  };
 }
 
 form.onsubmit = async event => {
@@ -423,6 +679,8 @@ for (const [id, path] of [
 ]) {
   const el = document.getElementById(id);
 
+  if (!el) continue;
+
   el.oninput = async event => {
     const [section, key] = path.split('.');
 
@@ -449,6 +707,7 @@ window.todoLite.onTodosChanged(data => {
 
 window.todoLite.onSettingsChanged(data => {
   applySettings(data);
+  render();
 });
 
 window.todoLite.onPanelFullscreenChanged(isFull => {
@@ -464,6 +723,9 @@ window.todoLite.onPanelFullscreenChanged(isFull => {
 
   applySettings(settings);
   initFontDropdown();
+  initAccentPicker();
+  initStartupToggle();
+  bindGlowLifecycle(panel);
 
   initLiquidSelect({
     rootId: 'languageDropdown',
@@ -478,6 +740,7 @@ window.todoLite.onPanelFullscreenChanged(isFull => {
         }
       });
       applySettings(next);
+      render();
     }
   });
 
@@ -485,11 +748,13 @@ window.todoLite.onPanelFullscreenChanged(isFull => {
     rootId: 'windowLevelDropdown',
     triggerId: 'windowLevelSelected',
     listId: 'windowLevelList',
-    options: windowLevelOptions,
-    getValue: () => settings.windowLevel || 'desktop',
+    options: widgetLayerOptions,
+    getValue: () => settings.widget?.layer || 'desktop',
     onChange: async value => {
       const next = await window.todoLite.updateSettings({
-        windowLevel: value
+        widget: {
+          layer: value
+        }
       });
       applySettings(next);
     }
