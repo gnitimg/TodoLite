@@ -286,6 +286,22 @@ function getWidgetLayer() {
   return settings.widget?.layer || 'desktop';
 }
 
+function enforceWidgetTrayOnly() {
+  if (!widgetWindow || widgetWindow.isDestroyed()) return;
+
+  widgetWindow.setSkipTaskbar(true);
+
+  setTimeout(() => {
+    if (!widgetWindow || widgetWindow.isDestroyed()) return;
+    widgetWindow.setSkipTaskbar(true);
+  }, 80);
+
+  setTimeout(() => {
+    if (!widgetWindow || widgetWindow.isDestroyed()) return;
+    widgetWindow.setSkipTaskbar(true);
+  }, 260);
+}
+
 function applyWidgetLayer(settings) {
   const layer = settings.widget?.layer || 'desktop';
 
@@ -297,6 +313,7 @@ function applyWidgetLayer(settings) {
     widgetWindow.setFocusable(true);
     widgetWindow.setAlwaysOnTop(true, 'screen-saver');
     widgetWindow.show();
+    enforceWidgetTrayOnly();
     return;
   }
 
@@ -305,18 +322,21 @@ function applyWidgetLayer(settings) {
   if (layer === 'normal') {
     widgetWindow.setFocusable(true);
     widgetWindow.show();
+    enforceWidgetTrayOnly();
     return;
   }
 
-  // desktop: 最低干扰层，只控制小 Todo。
-  // 纯 Electron 无法稳定挂到 WorkerW 桌面层，这里尽量避免抢焦点和任务栏出现。
+  // desktop：最低干扰层，只控制小 TodoList。
+  // 这里不置顶、不进任务栏、不抢焦点。
   widgetWindow.setFocusable(false);
   widgetWindow.showInactive();
+  enforceWidgetTrayOnly();
 
   setTimeout(() => {
     if (!widgetWindow || widgetWindow.isDestroyed()) return;
     widgetWindow.setFocusable(true);
     widgetWindow.blur();
+    enforceWidgetTrayOnly();
   }, 260);
 }
 
@@ -454,6 +474,9 @@ function createWindows() {
   });
 
   widgetWindow.loadFile(path.join(root, 'src', 'widget.html'));
+  widgetWindow.on('show', enforceWidgetTrayOnly);
+  widgetWindow.on('focus', enforceWidgetTrayOnly);
+  widgetWindow.on('restore', enforceWidgetTrayOnly);
 
   widgetWindow.once('ready-to-show', () => {
     applyWidgetLayer(settings);
@@ -533,7 +556,17 @@ function createTray() {
     { label: 'Open TodoLite', click: showPanel },
     {
       label: 'Show / Hide Desktop Layer',
-      click: () => widgetWindow?.isVisible() ? widgetWindow.hide() : widgetWindow.showInactive()
+      click: () => {
+        if (!widgetWindow) return;
+
+        if (widgetWindow.isVisible()) {
+          widgetWindow.hide();
+          return;
+        }
+
+        widgetWindow.showInactive();
+        enforceWidgetTrayOnly();
+      }
     },
     { type: 'separator' },
     {

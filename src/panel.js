@@ -24,6 +24,9 @@ const accentPresets = document.getElementById('accentPresets');
 
 const startupToggle = document.getElementById('startupToggle');
 const startupText = document.getElementById('startupText');
+let contextMenu = null;
+let datePickerDialog = null;
+let datePickerTarget = null;
 
 const accentPresetValues = [
   '#5f8cff',
@@ -40,8 +43,6 @@ const i18n = {
   'zh-CN': {
     tasks: '任务',
     settings: '设置',
-    subtitle: '清晰、精确、保留',
-    settingsSubtitle: '全局优先，然后调整每一块玻璃',
     active: '未完成',
     completedByDate: '按完成日期记录',
     nothingActive: '没有未完成任务',
@@ -69,7 +70,9 @@ const i18n = {
     detail: '详情，可选',
     search: '搜索...',
     noMatch: '没有匹配',
-    putFonts: '将 .ttf / .otf / .woff 放入 fonts 文件夹'
+    putFonts: '将 .ttf / .otf / .woff 放入 fonts 文件夹',
+    edit: '编辑',
+    selectTime: '选择时间'
   },
   'en-US': {
     tasks: 'Tasks',
@@ -103,7 +106,9 @@ const i18n = {
     detail: 'detail, optional',
     search: 'search...',
     noMatch: 'no match',
-    putFonts: 'put .ttf / .otf / .woff in fonts'
+    putFonts: 'put .ttf / .otf / .woff in fonts',
+    edit: 'edit',
+    selectTime: 'select time',
   }
 };
 
@@ -135,6 +140,18 @@ function fromLocalInput(value) {
   }
 
   return v;
+}
+
+function pad(n) {
+  return String(n).padStart(2, '0');
+}
+
+function defaultDdl() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() + 1);
+  d.setSeconds(0);
+  d.setMilliseconds(0);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
 }
 
 function clamp01(value) {
@@ -466,6 +483,8 @@ function makeTask(item, done = false) {
     done ? window.todoLite.restoreTodo(item.id) : window.todoLite.completeTodo(item.id);
   };
 
+  row.oncontextmenu = event => showContextMenu(event, item, row);
+
   return row;
 }
 
@@ -510,13 +529,164 @@ function openEditor(item) {
   editingId = item?.id || '';
 
   content.value = item?.content || '';
-  ddl.value = toLocalInput(item?.ddl) || '';
+  ddl.value = item?.ddl || defaultDdl();
   detail.value = item?.detail || '';
 
   deleteBtn.style.visibility = editingId ? 'visible' : 'hidden';
 
   editor.showModal();
   content.focus();
+}
+
+function ensureContextMenu() {
+  if (contextMenu) return contextMenu;
+
+  contextMenu = document.createElement('div');
+  contextMenu.className = 'task-context-menu glass no-drag';
+  contextMenu.innerHTML = `
+    <button type="button" data-action="edit">${t('edit')}</button>
+    <button type="button" data-action="remove" class="danger">${t('remove')}</button>
+  `;
+  document.body.appendChild(contextMenu);
+
+  document.addEventListener('click', hideContextMenu);
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') hideContextMenu();
+  });
+
+  return contextMenu;
+}
+
+function hideContextMenu() {
+  if (contextMenu) contextMenu.classList.remove('open');
+}
+
+function showContextMenu(event, item, row) {
+  event.preventDefault();
+  event.stopPropagation();
+
+  const menu = ensureContextMenu();
+
+  menu.querySelector('[data-action="edit"]').textContent = t('edit');
+  menu.querySelector('[data-action="remove"]').textContent = t('remove');
+
+  menu.querySelector('[data-action="edit"]').onclick = () => {
+    hideContextMenu();
+    openEditor(item);
+  };
+
+  menu.querySelector('[data-action="remove"]').onclick = () => {
+    hideContextMenu();
+    removeWithParticles(row, item.id);
+  };
+
+  menu.style.left = `${Math.min(event.clientX, window.innerWidth - 132)}px`;
+  menu.style.top = `${Math.min(event.clientY, window.innerHeight - 88)}px`;
+  menu.classList.add('open');
+}
+
+function removeWithParticles(row, id) {
+  if (!row || row.classList.contains('particle-removing')) return;
+
+  const rect = row.getBoundingClientRect();
+  const count = 22;
+
+  row.classList.add('particle-removing');
+
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('span');
+    p.className = 'particle-dot';
+
+    const x = rect.left + Math.random() * rect.width;
+    const y = rect.top + Math.random() * rect.height;
+    const dx = (Math.random() - 0.5) * 140;
+    const dy = (Math.random() - 0.5) * 90 - 24;
+
+    p.style.left = `${x}px`;
+    p.style.top = `${y}px`;
+    p.style.setProperty('--dx', `${dx}px`);
+    p.style.setProperty('--dy', `${dy}px`);
+    p.style.animationDelay = `${Math.random() * 100}ms`;
+
+    document.body.appendChild(p);
+
+    setTimeout(() => p.remove(), 820);
+  }
+
+  setTimeout(async () => {
+    await window.todoLite.removeTodo(id);
+  }, 560);
+}
+
+function ensureDatePicker() {
+  if (datePickerDialog) return datePickerDialog;
+
+  datePickerDialog = document.createElement('dialog');
+  datePickerDialog.className = 'glass ddl-dialog no-drag';
+
+  datePickerDialog.innerHTML = `
+    <form method="dialog" class="ddl-form">
+      <div class="dialog-title">${t('selectTime')}</div>
+      <div class="ddl-grid">
+        <input id="ddlYear" inputmode="numeric" maxlength="4" />
+        <input id="ddlMonth" inputmode="numeric" maxlength="2" />
+        <input id="ddlDay" inputmode="numeric" maxlength="2" />
+        <input id="ddlHour" inputmode="numeric" maxlength="2" />
+        <input id="ddlMinute" inputmode="numeric" maxlength="2" />
+        <input id="ddlSecond" inputmode="numeric" maxlength="2" />
+      </div>
+      <div class="ddl-labels">
+        <span>Y</span><span>M</span><span>D</span><span>H</span><span>M</span><span>S</span>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" id="ddlCancel">${t('cancel')}</button>
+        <button type="submit">${t('save')}</button>
+      </div>
+    </form>
+  `;
+
+  document.body.appendChild(datePickerDialog);
+
+  datePickerDialog.querySelector('#ddlCancel').onclick = () => datePickerDialog.close();
+
+  datePickerDialog.querySelector('.ddl-form').onsubmit = event => {
+    event.preventDefault();
+
+    const y = datePickerDialog.querySelector('#ddlYear').value.padStart(4, '0');
+    const mo = datePickerDialog.querySelector('#ddlMonth').value.padStart(2, '0');
+    const d = datePickerDialog.querySelector('#ddlDay').value.padStart(2, '0');
+    const h = datePickerDialog.querySelector('#ddlHour').value.padStart(2, '0');
+    const mi = datePickerDialog.querySelector('#ddlMinute').value.padStart(2, '0');
+    const s = datePickerDialog.querySelector('#ddlSecond').value.padStart(2, '0');
+
+    if (datePickerTarget) {
+      datePickerTarget.value = `${y}-${mo}-${d} ${h}:${mi}:${s}`;
+    }
+
+    datePickerDialog.close();
+  };
+
+  return datePickerDialog;
+}
+
+function openDatePicker(target) {
+  datePickerTarget = target;
+
+  const value = target.value || defaultDdl();
+  const [date, time] = value.split(' ');
+  const [y, mo, d] = (date || '').split('-');
+  const [h, mi, s] = (time || '').split(':');
+
+  const dialog = ensureDatePicker();
+
+  dialog.querySelector('#ddlYear').value = y || '';
+  dialog.querySelector('#ddlMonth').value = mo || '';
+  dialog.querySelector('#ddlDay').value = d || '';
+  dialog.querySelector('#ddlHour').value = h || '';
+  dialog.querySelector('#ddlMinute').value = mi || '';
+  dialog.querySelector('#ddlSecond').value = s || '00';
+
+  dialog.showModal();
 }
 
 function setFullscreenIconState(isFull) {
@@ -646,6 +816,13 @@ deleteBtn.onclick = async () => {
 };
 
 document.getElementById('cancelBtn').onclick = () => editor.close();
+ddl.onclick = () => openDatePicker(ddl);
+ddl.onkeydown = event => {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    openDatePicker(ddl);
+  }
+};
 document.getElementById('newBtn').onclick = () => openEditor();
 document.getElementById('openData').onclick = () => window.todoLite.openDataFolder();
 document.getElementById('openBackups').onclick = () => window.todoLite.openBackupFolder();
