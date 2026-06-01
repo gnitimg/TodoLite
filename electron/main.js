@@ -1,8 +1,10 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
-
 const root = path.join(__dirname, '..');
+const iconPath = app.isPackaged
+  ? path.join(process.resourcesPath, 'build', 'icon.ico')
+  : path.join(root, 'build', 'icon.ico');
 const legacyDataDir = path.join(root, 'data');
 const bundledFontsDir = app.isPackaged
   ? path.join(process.resourcesPath, 'fonts')
@@ -456,6 +458,7 @@ function createWindows() {
   const pb = ps.bounds || defaultSettings.panel.bounds;
 
   widgetWindow = new BrowserWindow({
+    icon: iconPath,
     width: wb.width || 430,
     height: wb.height || 340,
     x: Number.isFinite(wb.x) ? wb.x : 36,
@@ -512,6 +515,7 @@ function createWindows() {
   });
 
   panelWindow = new BrowserWindow({
+    icon: iconPath,
     width: pb.width || 780,
     height: pb.height || 640,
     minWidth: 620,
@@ -544,14 +548,7 @@ function createWindows() {
 }
 
 function createTray() {
-  const svg = encodeURIComponent(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">
-      <rect x="9" y="9" width="46" height="46" rx="14" fill="rgba(255,255,255,.88)"/>
-      <path d="M22 33l7 7 15-18" fill="none" stroke="rgba(20,20,24,.86)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-  `);
-
-  const icon = nativeImage.createFromDataURL(`data:image/svg+xml;charset=utf-8,${svg}`);
+  const icon = nativeImage.createFromPath(trayIconPath).resize({ width: 16, height: 16 });
 
   tray = new Tray(icon);
   tray.setToolTip('TodoLite');
