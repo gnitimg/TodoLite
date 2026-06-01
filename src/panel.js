@@ -331,9 +331,10 @@ function setSurfaceVars(target, surface, global) {
 
 function applyGlobalSettings(global) {
   const g = global || {};
+  const safeName = safeFontName(g.fontFamily || 'system');
 
   const family = g.fontFamily && g.fontFamily !== 'system'
-    ? `'${g.fontFamily}', 'Segoe UI', system-ui, sans-serif`
+    ? `'${safeName}', 'Segoe UI', system-ui, sans-serif`
     : `Inter, 'Segoe UI', system-ui, sans-serif`;
 
   document.documentElement.lang = g.language || 'zh-CN';
@@ -429,6 +430,10 @@ function updateStartupSelected() {
   startupText.textContent = enabled ? t('on') : t('off');
 }
 
+function safeFontName(name) {
+  return String(name || '').replace(/['\\]/g, '');
+}
+
 function injectProjectFonts(list) {
   if (!list.length) return;
 
@@ -437,9 +442,11 @@ function injectProjectFonts(list) {
 
   const style = document.createElement('style');
   style.id = 'projectFontsStyle';
-  style.textContent = list.map(f =>
-    `@font-face{font-family:'${f.name}';src:url('${f.url}');font-display:swap;}`
-  ).join('\n');
+
+  style.textContent = list.map(f => {
+    const name = safeFontName(f.name);
+    return `@font-face{font-family:'${name}';src:url('${f.url}');font-display:swap;}`;
+  }).join('\n');
 
   document.head.appendChild(style);
 }
@@ -491,18 +498,41 @@ function buildFontList(filter) {
   list.innerHTML = '';
 
   const f = (filter || '').toLowerCase();
-  const projectFiltered = (fonts.project || []).filter(font => !f || font.name.toLowerCase().includes(f));
+  const projectFonts = fonts.project || [];
+  const systemFonts = fonts.system || [];
+
+  const projectFiltered = projectFonts.filter(font => !f || font.name.toLowerCase().includes(f));
+  const systemFiltered = systemFonts.filter(font => !f || font.name.toLowerCase().includes(f));
   const currentFont = (settings.global || {}).fontFamily || 'system';
 
   function addOption(font) {
     const opt = document.createElement('button');
+    const safeName = safeFontName(font.name);
 
     opt.type = 'button';
     opt.className = 'liquid-option' + (font.name === currentFont ? ' active' : '');
     opt.textContent = font.name;
-    opt.style.fontFamily = font.name !== 'system' ? `'${font.name}', sans-serif` : '';
+    opt.style.fontFamily = font.name !== 'system' ? `'${safeName}', sans-serif` : '';
 
     opt.onclick = async () => {
+      const safeName = safeFontName(font.name);
+      const selected = document.getElementById('globalFontSelected');
+
+      if (selected) {
+        selected.textContent = font.name;
+        selected.style.fontFamily = font.name !== 'system' ? `'${safeName}', sans-serif` : '';
+      }
+
+      const immediateFamily = font.name !== 'system'
+        ? `'${safeName}', 'Segoe UI', system-ui, sans-serif`
+        : `Inter, 'Segoe UI', system-ui, sans-serif`;
+
+      document.documentElement.style.setProperty('--font-family', immediateFamily);
+      document.body.style.fontFamily = immediateFamily;
+
+      document.getElementById('globalFontDropdown').classList.remove('open');
+      document.getElementById('globalFontSearch').value = '';
+
       const next = await window.todoLite.updateSettings({
         global: {
           fontFamily: font.name
@@ -510,9 +540,6 @@ function buildFontList(filter) {
       });
 
       applySettings(next);
-
-      document.getElementById('globalFontDropdown').classList.remove('open');
-      document.getElementById('globalFontSearch').value = '';
     };
 
     list.appendChild(opt);
@@ -523,20 +550,29 @@ function buildFontList(filter) {
   if (projectFiltered.length) {
     const sep = document.createElement('div');
     sep.className = 'liquid-sep';
-    sep.textContent = 'fonts';
+    sep.textContent = 'project fonts';
     list.appendChild(sep);
 
     projectFiltered.forEach(addOption);
   }
 
-  if (!projectFiltered.length && f) {
+  if (systemFiltered.length) {
+    const sep = document.createElement('div');
+    sep.className = 'liquid-sep';
+    sep.textContent = 'windows fonts';
+    list.appendChild(sep);
+
+    systemFiltered.slice(0, 2000).forEach(addOption);
+  }
+
+  if (!projectFiltered.length && !systemFiltered.length && f) {
     const empty = document.createElement('div');
     empty.className = 'liquid-empty';
     empty.textContent = t('noMatch');
     list.appendChild(empty);
   }
 
-  if (!projectFiltered.length && !f) {
+  if (!projectFiltered.length && !systemFiltered.length && !f) {
     const empty = document.createElement('div');
     empty.className = 'liquid-empty';
     empty.textContent = t('putFonts');
@@ -1037,7 +1073,10 @@ window.todoLite.onPanelFullscreenChanged(isFull => {
 
 (async function init() {
   fonts = await window.todoLite.listFonts();
-  injectProjectFonts(fonts.project || []);
+  injectProjectFonts([
+    ...(fonts.project || []),
+    ...(fonts.system || [])
+  ]);
 
   todos = await window.todoLite.getTodos();
   settings = await window.todoLite.getSettings();

@@ -581,20 +581,46 @@ function createTray() {
   ]));
 }
 
-function scanProjectFonts() {
+function fontNameFromFile(fileName) {
+  return path.parse(fileName).name
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function scanFontDir(dir, system = false) {
   try {
-    return fs.readdirSync(fontsDir, { withFileTypes: true })
+    if (!fs.existsSync(dir)) return [];
+
+    return fs.readdirSync(dir, { withFileTypes: true })
       .filter(f => f.isFile() && /\.(ttf|otf|woff|woff2)$/i.test(f.name))
-      .map(f => ({
-        name: path.parse(f.name).name,
-        file: f.name,
-        url: `file://${path.join(fontsDir, f.name).replace(/\\/g, '/')}`,
-        system: false
-      }))
+      .map(f => {
+        const fullPath = path.join(dir, f.name);
+
+        return {
+          name: fontNameFromFile(f.name),
+          file: f.name,
+          url: `file://${fullPath.replace(/\\/g, '/')}`,
+          system
+        };
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
   } catch {
     return [];
   }
+}
+
+function scanProjectFonts() {
+  return scanFontDir(fontsDir, false);
+}
+
+function scanWindowsFonts() {
+  if (process.platform !== 'win32') return [];
+
+  const winDir = process.env.WINDIR || 'C:\\Windows';
+  const systemFontsDir = path.join(winDir, 'Fonts');
+
+  return scanFontDir(systemFontsDir, true);
 }
 
 ipcMain.handle('todos:get', () => readJson(todosPath, baseTodoData()));
@@ -605,7 +631,10 @@ ipcMain.handle('settings:get', () => {
   return settings;
 });
 
-ipcMain.handle('fonts:list', () => ({ project: scanProjectFonts(), system: [] }));
+ipcMain.handle('fonts:list', () => ({
+  project: scanProjectFonts(),
+  system: scanWindowsFonts()
+}));
 
 ipcMain.handle('todos:add', (_, todo) => {
   const data = readJson(todosPath, baseTodoData());

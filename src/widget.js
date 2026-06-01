@@ -132,9 +132,10 @@ function setSurfaceVars(target, surface, global) {
 
 function applyGlobalSettings(global) {
   const g = global || {};
+  const safeName = safeFontName(g.fontFamily || 'system');
 
   const family = g.fontFamily && g.fontFamily !== 'system'
-    ? `'${g.fontFamily}', 'Segoe UI', system-ui, sans-serif`
+    ? `'${safeName}', 'Segoe UI', system-ui, sans-serif`
     : `Inter, 'Segoe UI', system-ui, sans-serif`;
 
   document.documentElement.lang = g.language || 'zh-CN';
@@ -482,6 +483,10 @@ window.todoLite.onSettingsChanged(data => {
   render();
 });
 
+function safeFontName(name) {
+  return String(name || '').replace(/['\\]/g, '');
+}
+
 function injectProjectFonts(list) {
   if (!list.length) return;
 
@@ -490,16 +495,21 @@ function injectProjectFonts(list) {
 
   const style = document.createElement('style');
   style.id = 'projectFontsStyle';
-  style.textContent = list.map(f =>
-    `@font-face{font-family:'${f.name}';src:url('${f.url}');font-display:swap;}`
-  ).join('\n');
+
+  style.textContent = list.map(f => {
+    const name = safeFontName(f.name);
+    return `@font-face{font-family:'${name}';src:url('${f.url}');font-display:swap;}`;
+  }).join('\n');
 
   document.head.appendChild(style);
 }
 
 (async function init() {
   const fontData = await window.todoLite.listFonts();
-  injectProjectFonts(fontData.project || []);
+  injectProjectFonts([
+    ...(fontData.project || []),
+    ...(fontData.system || [])
+  ]);
 
   todos = await window.todoLite.getTodos();
   settings = await window.todoLite.getSettings();

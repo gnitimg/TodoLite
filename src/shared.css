@@ -656,3 +656,52 @@ textarea {
     inset 0 1px 0 rgba(255,255,255,.44),
     0 8px 20px rgba(0,0,0,.08);
 }
+
+#globalFontList,
+#globalFontList.liquid-options {
+  max-height: 230px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+#globalFontList::-webkit-scrollbar,
+#globalFontList.liquid-options::-webkit-scrollbar {
+  display: none;
+}
+
+.liquid-toggle {
+  position: relative !important;
+  overflow: hidden !important;
+  justify-content: center !important;
+}
+
+.liquid-toggle .toggle-dot {
+  position: absolute !important;
+  left: 6px !important;
+  top: 50% !important;
+  z-index: 2 !important;
+  transform: translate(0, -50%) !important;
+}
+
+.liquid-toggle .toggle-text {
+  position: absolute !important;
+  right: 14px !important;
+  left: auto !important;
+  z-index: 1 !important;
+  padding: 0 !important;
+  text-align: right !important;
+  transition:
+    left .24s cubic-bezier(.2,.8,.2,1),
+    right .24s cubic-bezier(.2,.8,.2,1),
+    color .2s ease !important;
+}
+
+.liquid-toggle.active .toggle-dot {
+  left: calc(100% - 32px) !important;
+}
+
+.liquid-toggle.active .toggle-text {
+  left: 14px !important;
+  right: auto !important;
+  text-align: left !important;
+}
