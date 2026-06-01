@@ -1,6 +1,6 @@
 let todos = { active: [], completed: {}, removed: [] };
 let settings = {};
-let fonts = [];
+let fonts = { project: [], system: [] };
 let editingId = '';
 
 const activeList = document.getElementById('activeList');
@@ -17,25 +17,127 @@ function fromLocalInput(value) { return (value || '').replace('T', ' '); }
 
 function applySettings(s) {
   settings = s || {};
-  document.documentElement.style.setProperty('--font-size', `${settings.fontSize || 14}px`);
-  document.documentElement.style.setProperty('--opacity', settings.glassOpacity ?? .34);
-  document.documentElement.style.setProperty('--blur', `${settings.blurStrength || 28}px`);
-  document.documentElement.style.setProperty('--radius', `${settings.cornerRadius || 28}px`);
-  document.documentElement.style.setProperty('--font-family', settings.fontFamily && settings.fontFamily !== 'system' ? `'${settings.fontFamily}', 'Segoe UI', system-ui, sans-serif` : `Inter, 'Segoe UI', system-ui, sans-serif`);
-  for (const [id, fallback] of [['fontSize', 14], ['glassOpacity', .34], ['blurStrength', 28], ['cornerRadius', 28]]) {
-    const el = document.getElementById(id);
-    if (el) el.value = settings[id] ?? fallback;
-  }
-  document.getElementById('windowLevel').value = settings.windowLevel || 'desktop';
-  document.getElementById('fontFamily').value = settings.fontFamily || 'system';
+  const ps = settings.panel || {};
+  document.documentElement.style.setProperty('--font-size', `${ps.fontSize || 14}px`);
+  document.documentElement.style.setProperty('--opacity', ps.glassOpacity ?? .20);
+  document.documentElement.style.setProperty('--blur', `${ps.blurStrength || 18}px`);
+  document.documentElement.style.setProperty('--radius', `${ps.cornerRadius || 22}px`);
+  const ws = settings.widget || {};
+  document.documentElement.style.setProperty('--font-family',
+    ws.fontFamily && ws.fontFamily !== 'system'
+      ? `'${ws.fontFamily}', 'Segoe UI', system-ui, sans-serif`
+      : `Inter, 'Segoe UI', system-ui, sans-serif`);
+  syncSettingsUI();
 }
 
-function injectFonts(list) {
+function syncSettingsUI() {
+  const ws = settings.widget || {};
+  const ps = settings.panel || {};
+  setVal('widgetFontSize', ws.fontSize || 14);
+  setVal('widgetGlassOpacity', ws.glassOpacity ?? .14);
+  setVal('widgetBlurStrength', ws.blurStrength || 36);
+  setVal('widgetCornerRadius', ws.cornerRadius || 24);
+  setVal('panelGlassOpacity', ps.glassOpacity ?? .20);
+  setVal('panelBlurStrength', ps.blurStrength || 18);
+  setVal('panelCornerRadius', ps.cornerRadius || 22);
+  document.getElementById('windowLevel').value = settings.windowLevel || 'desktop';
+  updateFontSelected();
+}
+function setVal(id, val) { const el = document.getElementById(id); if (el) el.value = val; }
+
+function updateFontSelected() {
+  const ws = settings.widget || {};
+  const name = ws.fontFamily || 'system';
+  document.getElementById('widgetFontSelected').textContent = name;
+  document.getElementById('widgetFontSelected').style.fontFamily =
+    name !== 'system' ? `'${name}', sans-serif` : '';
+}
+
+function injectProjectFonts(list) {
+  if (!list.length) return;
   const style = document.createElement('style');
-  style.textContent = list.map(font => `@font-face{font-family:'${font.name}';src:url('${font.url}');}`).join('\n');
+  style.textContent = list.map(f =>
+    `@font-face{font-family:'${f.name}';src:url('${f.url}');font-display:swap;}`
+  ).join('\n');
   document.head.appendChild(style);
-  const select = document.getElementById('fontFamily');
-  select.innerHTML = `<option value="system">system</option>` + list.map(f => `<option value="${f.name}">${f.name}</option>`).join('');
+}
+
+function buildFontList(filter) {
+  const list = document.getElementById('widgetFontList');
+  list.innerHTML = '';
+  const f = (filter || '').toLowerCase();
+  const projectFiltered = fonts.project.filter(font => !f || font.name.toLowerCase().includes(f));
+  const systemFiltered = fonts.system.filter(font => !f || font.name.toLowerCase().includes(f));
+  const currentFont = (settings.widget || {}).fontFamily || 'system';
+
+  function addOption(font) {
+    const opt = document.createElement('div');
+    opt.className = 'font-option' + (font.name === currentFont ? ' active' : '');
+    opt.textContent = font.name;
+    opt.style.fontFamily = font.system ? `'${font.name}', sans-serif` : `'${font.name}', sans-serif`;
+    opt.onclick = () => {
+      window.todoLite.updateSettings({ widget: { fontFamily: font.name } });
+      document.getElementById('widgetFontDropdown').classList.remove('open');
+      document.getElementById('widgetFontSearch').value = '';
+    };
+    list.appendChild(opt);
+  }
+
+  function addSystemDefault() {
+    const opt = document.createElement('div');
+    opt.className = 'font-option' + (currentFont === 'system' ? ' active' : '');
+    opt.textContent = 'system';
+    opt.onclick = () => {
+      window.todoLite.updateSettings({ widget: { fontFamily: 'system' } });
+      document.getElementById('widgetFontDropdown').classList.remove('open');
+      document.getElementById('widgetFontSearch').value = '';
+    };
+    list.appendChild(opt);
+  }
+
+  addSystemDefault();
+
+  if (projectFiltered.length) {
+    const sep = document.createElement('div');
+    sep.className = 'font-sep';
+    sep.textContent = 'project';
+    list.appendChild(sep);
+    projectFiltered.forEach(addOption);
+  }
+  if (systemFiltered.length) {
+    const sep = document.createElement('div');
+    sep.className = 'font-sep';
+    sep.textContent = 'system';
+    list.appendChild(sep);
+    systemFiltered.forEach(addOption);
+  }
+  if (!projectFiltered.length && !systemFiltered.length && f) {
+    const empty = document.createElement('div');
+    empty.className = 'font-option';
+    empty.textContent = 'no match';
+    empty.style.color = 'var(--muted)';
+    list.appendChild(empty);
+  }
+}
+
+function initFontDropdown() {
+  const dropdown = document.getElementById('widgetFontDropdown');
+  const selected = document.getElementById('widgetFontSelected');
+  const search = document.getElementById('widgetFontSearch');
+
+  selected.onclick = e => {
+    e.stopPropagation();
+    const wasOpen = dropdown.classList.contains('open');
+    dropdown.classList.toggle('open');
+    if (!wasOpen) { search.value = ''; search.focus(); buildFontList(''); }
+  };
+
+  search.oninput = () => buildFontList(search.value);
+  search.onkeydown = e => { if (e.key === 'Escape') dropdown.classList.remove('open'); };
+
+  document.addEventListener('click', e => {
+    if (!dropdown.contains(e.target)) dropdown.classList.remove('open');
+  });
 }
 
 function makeTask(item, done = false) {
@@ -93,15 +195,15 @@ form.onsubmit = async event => {
   editor.close();
 };
 
-deleteBtn.onclick = async () => {
-  if (editingId) await window.todoLite.removeTodo(editingId);
-  editor.close();
-};
+deleteBtn.onclick = async () => { if (editingId) await window.todoLite.removeTodo(editingId); editor.close(); };
 document.getElementById('cancelBtn').onclick = () => editor.close();
 document.getElementById('newBtn').onclick = () => openEditor();
-document.getElementById('closeBtn').onclick = () => window.todoLite.closePanel();
 document.getElementById('openData').onclick = () => window.todoLite.openDataFolder();
 document.getElementById('openBackups').onclick = () => window.todoLite.openBackupFolder();
+
+document.getElementById('tlClose').onclick = () => window.todoLite.closePanel();
+document.getElementById('tlMin').onclick = () => window.todoLite.minimizePanel();
+document.getElementById('tlFull').onclick = () => window.todoLite.fullscreenPanel();
 
 for (const btn of document.querySelectorAll('.nav')) {
   btn.onclick = () => {
@@ -112,21 +214,34 @@ for (const btn of document.querySelectorAll('.nav')) {
   };
 }
 
-for (const id of ['fontSize', 'glassOpacity', 'blurStrength', 'cornerRadius', 'windowLevel', 'fontFamily']) {
+for (const [id, path] of [
+  ['widgetFontSize', 'widget.fontSize'],
+  ['widgetGlassOpacity', 'widget.glassOpacity'],
+  ['widgetBlurStrength', 'widget.blurStrength'],
+  ['widgetCornerRadius', 'widget.cornerRadius'],
+  ['panelGlassOpacity', 'panel.glassOpacity'],
+  ['panelBlurStrength', 'panel.blurStrength'],
+  ['panelCornerRadius', 'panel.cornerRadius'],
+]) {
   document.getElementById(id).oninput = event => {
-    const value = event.target.type === 'range' ? Number(event.target.value) : event.target.value;
-    window.todoLite.updateSettings({ [id]: value });
+    const [section, key] = path.split('.');
+    window.todoLite.updateSettings({ [section]: { [key]: Number(event.target.value) } });
   };
 }
+
+document.getElementById('windowLevel').oninput = event => {
+  window.todoLite.updateSettings({ windowLevel: event.target.value });
+};
 
 window.todoLite.onTodosChanged(data => { todos = data; render(); });
 window.todoLite.onSettingsChanged(data => applySettings(data));
 
 (async function init() {
   fonts = await window.todoLite.listFonts();
-  injectFonts(fonts);
+  injectProjectFonts(fonts.project);
   todos = await window.todoLite.getTodos();
   settings = await window.todoLite.getSettings();
   applySettings(settings);
+  initFontDropdown();
   render();
 })();

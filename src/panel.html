@@ -8,11 +8,15 @@
 <body>
   <main class="panel glass">
     <aside class="side drag">
+      <div class="traffic-lights no-drag">
+        <button class="tl-btn tl-close" id="tlClose" title="close"></button>
+        <button class="tl-btn tl-min" id="tlMin" title="minimize"></button>
+        <button class="tl-btn tl-full" id="tlFull" title="fullscreen"></button>
+      </div>
       <div class="brand">TodoLite</div>
       <button class="nav active no-drag" data-page="tasks">Tasks</button>
       <button class="nav no-drag" data-page="settings">Settings</button>
       <div class="spacer"></div>
-      <button id="closeBtn" class="ghost no-drag">hide</button>
     </aside>
     <section class="page no-drag" id="tasksPage">
       <div class="topbar drag">
@@ -20,20 +24,41 @@
           <h1>Tasks</h1>
           <p>visible, exact, retained</p>
         </div>
-        <button id="newBtn" class="primary no-drag">＋</button>
+        <button id="newBtn" class="primary no-drag">+</button>
       </div>
       <div id="activeList" class="block"></div>
       <div id="completedList" class="block completed-block"></div>
     </section>
     <section class="page no-drag hidden" id="settingsPage">
-      <div class="topbar drag"><div><h1>Settings</h1><p>only what changes the layer</p></div></div>
-      <div class="settings-grid">
-        <label>Font<select id="fontFamily"></select></label>
-        <label>Font size<input id="fontSize" type="range" min="11" max="20" step="1"></label>
-        <label>Opacity<input id="glassOpacity" type="range" min="0.18" max="0.72" step="0.01"></label>
-        <label>Blur<input id="blurStrength" type="range" min="8" max="42" step="1"></label>
-        <label>Radius<input id="cornerRadius" type="range" min="14" max="36" step="1"></label>
-        <label>Layer<select id="windowLevel"><option value="desktop">desktop</option><option value="normal">normal</option><option value="topmost">topmost</option></select></label>
+      <div class="topbar drag"><div><h1>Settings</h1><p>per-window appearance</p></div></div>
+      <div class="settings-columns">
+        <div class="settings-col">
+          <div class="col-title">Widget</div>
+          <div class="settings-grid">
+            <label>Font
+              <div class="font-dropdown no-drag" id="widgetFontDropdown">
+                <div class="font-selected" id="widgetFontSelected">system</div>
+                <div class="font-panel">
+                  <input class="font-search" id="widgetFontSearch" placeholder="search..." autocomplete="off" />
+                  <div class="font-list" id="widgetFontList"></div>
+                </div>
+              </div>
+            </label>
+            <label>Font size<input id="widgetFontSize" type="range" min="11" max="20" step="1"></label>
+            <label>Opacity<input id="widgetGlassOpacity" type="range" min="0.06" max="0.50" step="0.01"></label>
+            <label>Blur<input id="widgetBlurStrength" type="range" min="8" max="48" step="1"></label>
+            <label>Radius<input id="widgetCornerRadius" type="range" min="10" max="36" step="1"></label>
+          </div>
+        </div>
+        <div class="settings-col">
+          <div class="col-title">Panel</div>
+          <div class="settings-grid">
+            <label>Opacity<input id="panelGlassOpacity" type="range" min="0.08" max="0.60" step="0.01"></label>
+            <label>Blur<input id="panelBlurStrength" type="range" min="4" max="36" step="1"></label>
+            <label>Radius<input id="panelCornerRadius" type="range" min="10" max="36" step="1"></label>
+            <label>Layer<select id="windowLevel"><option value="desktop">desktop</option><option value="normal">normal</option><option value="topmost">topmost</option></select></label>
+          </div>
+        </div>
       </div>
       <div class="data-actions">
         <button id="openData">open data</button>

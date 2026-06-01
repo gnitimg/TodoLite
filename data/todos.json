@@ -1,14 +1,12 @@
 {
-  "active": [],
-  "completed": {
-    "2026-06-01": [
-      {
-        "id": "sample-1",
-        "content": "完成 TodoLite MVP",
-        "ddl": "2026-06-03 23:59:00",
-        "detail": "基础桌面层只显示 checkbox、内容、ddl，完整页面记录完成日期。"
-      }
-    ]
-  },
+  "active": [
+    {
+      "id": "sample-1",
+      "content": "Complete TodoLite MVP",
+      "ddl": "2026-06-03 23:59:00",
+      "detail": "Desktop widget with embedded glass, panel with traffic lights."
+    }
+  ],
+  "completed": {},
   "removed": []
 }

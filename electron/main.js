@@ -9,6 +9,12 @@ const todosPath = path.join(dataDir, 'todos.json');
 const settingsPath = path.join(dataDir, 'settings.json');
 const backupDir = path.join(dataDir, 'backups');
 
+const defaultSettings = {
+  widget: { fontFamily: 'system', fontSize: 14, glassOpacity: 0.14, blurStrength: 36, cornerRadius: 24 },
+  panel:  { fontFamily: 'system', fontSize: 14, glassOpacity: 0.20, blurStrength: 18, cornerRadius: 22 },
+  windowLevel: 'desktop'
+};
+
 let widgetWindow;
 let panelWindow;
 let tray;
@@ -21,19 +27,35 @@ function ensureDataFiles() {
     fs.writeFileSync(todosPath, JSON.stringify({ active: [], completed: {}, removed: [] }, null, 2));
   }
   if (!fs.existsSync(settingsPath)) {
-    fs.writeFileSync(settingsPath, JSON.stringify({
-      fontFamily: 'system', fontSize: 14, glassOpacity: 0.34, blurStrength: 28,
-      cornerRadius: 28, animation: true, windowLevel: 'desktop'
-    }, null, 2));
+    fs.writeFileSync(settingsPath, JSON.stringify(defaultSettings, null, 2));
+  } else {
+    const raw = readJson(settingsPath, {});
+    if (!raw.widget || !raw.panel) {
+      const migrated = {
+        widget: {
+          fontFamily: raw.fontFamily || 'system',
+          fontSize: raw.fontSize || 14,
+          glassOpacity: raw.glassOpacity ?? defaultSettings.widget.glassOpacity,
+          blurStrength: raw.blurStrength || 36,
+          cornerRadius: raw.cornerRadius || 24
+        },
+        panel: {
+          fontFamily: raw.fontFamily || 'system',
+          fontSize: raw.fontSize || 14,
+          glassOpacity: 0.20,
+          blurStrength: raw.blurStrength || 18,
+          cornerRadius: raw.cornerRadius || 22
+        },
+        windowLevel: raw.windowLevel || 'desktop'
+      };
+      atomicWriteJson(settingsPath, migrated, false);
+    }
   }
 }
 
 function readJson(file, fallback) {
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch {
-    return fallback;
-  }
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
+  catch { return fallback; }
 }
 
 function stamp() {
@@ -55,8 +77,7 @@ function atomicWriteJson(file, value, withBackup = false) {
     fs.copyFileSync(file, path.join(backupDir, `todos_${stamp()}.json`));
     const backups = fs.readdirSync(backupDir)
       .filter(name => name.startsWith('todos_') && name.endsWith('.json'))
-      .sort()
-      .reverse();
+      .sort().reverse();
     for (const old of backups.slice(30)) fs.rmSync(path.join(backupDir, old), { force: true });
   }
   const tmp = `${file}.tmp`;
@@ -77,53 +98,31 @@ function broadcastSettings() {
 }
 
 function applyWindowLevel(settings) {
-  const windows = [widgetWindow, panelWindow].filter(Boolean);
-  for (const win of windows) {
+  [widgetWindow, panelWindow].filter(Boolean).forEach(win => {
     if (settings.windowLevel === 'topmost') win.setAlwaysOnTop(true, 'screen-saver');
     else win.setAlwaysOnTop(false);
-  }
+  });
 }
 
 function createWindows() {
-  const settings = readJson(settingsPath, {});
+  const settings = readJson(settingsPath, defaultSettings);
+  const ws = settings.widget || defaultSettings.widget;
 
   widgetWindow = new BrowserWindow({
-    width: 430,
-    height: 340,
-    x: 36,
-    y: 80,
-    frame: false,
-    transparent: true,
-    resizable: false,
-    hasShadow: false,
-    show: true,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false
-    }
+    width: 430, height: 340, x: 36, y: 80,
+    frame: false, transparent: true, resizable: false, hasShadow: false, show: true,
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false }
   });
   widgetWindow.loadFile(path.join(root, 'src', 'widget.html'));
 
   panelWindow = new BrowserWindow({
-    width: 780,
-    height: 640,
-    frame: false,
-    transparent: true,
-    resizable: true,
-    show: false,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false
-    }
+    width: 780, height: 640,
+    frame: false, transparent: true, resizable: true, show: false,
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false }
   });
   panelWindow.loadFile(path.join(root, 'src', 'panel.html'));
   panelWindow.on('close', event => {
-    if (!app.isQuiting) {
-      event.preventDefault();
-      panelWindow.hide();
-    }
+    if (!app.isQuiting) { event.preventDefault(); panelWindow.hide(); }
   });
 
   applyWindowLevel(settings);
@@ -151,18 +150,40 @@ function showPanel() {
 
 function togglePanel() {
   if (!panelWindow) return;
-  if (panelWindow.isVisible()) panelWindow.hide();
-  else showPanel();
+  panelWindow.isVisible() ? panelWindow.hide() : showPanel();
+}
+
+function scanSystemFonts() {
+  const fonts = [];
+  const seen = new Set();
+  const fontDir = 'C:\\Windows\\Fonts';
+  try {
+    fs.readdirSync(fontDir)
+      .filter(f => /\.(ttf|otf)$/i.test(f))
+      .forEach(f => {
+        const name = path.parse(f).name;
+        const key = name.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          fonts.push({ name, file: f, url: `file://${path.join(fontDir, f).replace(/\\/g, '/')}`, system: true });
+        }
+      });
+  } catch {}
+  fonts.sort((a, b) => a.name.localeCompare(b.name));
+  return fonts;
+}
+
+function scanProjectFonts() {
+  try {
+    return fs.readdirSync(fontsDir, { withFileTypes: true })
+      .filter(f => f.isFile() && /\.(ttf|otf|woff|woff2)$/i.test(f.name))
+      .map(f => ({ name: path.parse(f.name).name, file: f.name, url: `file://${path.join(fontsDir, f.name).replace(/\\/g, '/')}`, system: false }));
+  } catch { return []; }
 }
 
 ipcMain.handle('todos:get', () => readJson(todosPath, { active: [], completed: {}, removed: [] }));
-ipcMain.handle('settings:get', () => readJson(settingsPath, {}));
-ipcMain.handle('fonts:list', () => {
-  const files = fs.readdirSync(fontsDir, { withFileTypes: true })
-    .filter(f => f.isFile() && /\.(ttf|otf|woff|woff2)$/i.test(f.name))
-    .map(f => ({ name: path.parse(f.name).name, file: f.name, url: `file://${path.join(fontsDir, f.name).replace(/\\/g, '/')}` }));
-  return files;
-});
+ipcMain.handle('settings:get', () => readJson(settingsPath, defaultSettings));
+ipcMain.handle('fonts:list', () => ({ project: scanProjectFonts(), system: scanSystemFonts() }));
 
 ipcMain.handle('todos:add', (_, todo) => {
   const data = readJson(todosPath, { active: [], completed: {}, removed: [] });
@@ -217,20 +238,12 @@ ipcMain.handle('todos:remove', (_, id) => {
   const data = readJson(todosPath, { active: [], completed: {}, removed: [] });
   const move = arr => {
     const idx = arr.findIndex(item => item.id === id);
-    if (idx >= 0) {
-      const [todo] = arr.splice(idx, 1);
-      data.removed = data.removed || [];
-      data.removed.unshift(todo);
-      return true;
-    }
+    if (idx >= 0) { const [todo] = arr.splice(idx, 1); data.removed = data.removed || []; data.removed.unshift(todo); return true; }
     return false;
   };
   if (!move(data.active)) {
     for (const key of Object.keys(data.completed || {})) {
-      if (move(data.completed[key])) {
-        if (data.completed[key].length === 0) delete data.completed[key];
-        break;
-      }
+      if (move(data.completed[key])) { if (data.completed[key].length === 0) delete data.completed[key]; break; }
     }
   }
   atomicWriteJson(todosPath, data, true);
@@ -239,7 +252,9 @@ ipcMain.handle('todos:remove', (_, id) => {
 });
 
 ipcMain.handle('settings:update', (_, patch) => {
-  const settings = { ...readJson(settingsPath, {}), ...patch };
+  const settings = { ...readJson(settingsPath, defaultSettings), ...patch };
+  if (patch.widget) settings.widget = { ...(settings.widget || defaultSettings.widget), ...patch.widget };
+  if (patch.panel)  settings.panel  = { ...(settings.panel  || defaultSettings.panel),  ...patch.panel };
   atomicWriteJson(settingsPath, settings, false);
   applyWindowLevel(settings);
   broadcastSettings();
@@ -249,6 +264,11 @@ ipcMain.handle('settings:update', (_, patch) => {
 ipcMain.handle('folder:open-data', () => shell.openPath(dataDir));
 ipcMain.handle('folder:open-backups', () => shell.openPath(backupDir));
 ipcMain.handle('app:close-panel', () => panelWindow?.hide());
+ipcMain.handle('app:minimize-panel', () => panelWindow?.minimize());
+ipcMain.handle('app:fullscreen-panel', () => {
+  if (!panelWindow) return;
+  panelWindow.isFullScreen() ? panelWindow.setFullScreen(false) : panelWindow.setFullScreen(true);
+});
 ipcMain.handle('app:quit', () => { app.isQuiting = true; app.quit(); });
 
 app.whenReady().then(() => {

@@ -65,16 +65,24 @@ TodoLite/
 ## Features
 
 ### Widget (Desktop Layer)
-- Checkbox to complete — animated line sweep left-to-right, then collapse
+- Checkbox to complete — dark-gray line sweep left-to-right, then collapse
+- Embedded wallpaper effect: ultra-low glass opacity, no visible border
 - Click to expand detail; double-click to edit
 - Sort by DDL toggle
 - Add new task inline
-- Liquid-glass background with configurable blur, opacity, radius
 
 ### Panel (Tray-Open Full Page)
 - **Tasks page** — active list + completed-by-date archive
-- **Settings page** — font family (reads `fonts/`), font size, glass opacity, blur strength, corner radius, window layer (desktop / normal / topmost)
-- Sidebar navigation with animated transitions
+- **Settings page** — independent glass config for widget and panel
+- macOS-style traffic light buttons (close / minimize / fullscreen)
+- Sidebar navigation
+- Lighter glass effect (less blur, more transparent) for the full page
+
+### Fonts
+- System font scanning from `C:\Windows\Fonts`
+- Project fonts from `fonts/` directory
+- Searchable glass-styled font dropdown in settings
+- Live font preview in dropdown
 
 ### Data Safety
 - Atomic writes (write to `.tmp`, then rename)
@@ -92,7 +100,19 @@ Requires Node.js. Uses Electron — no native dependencies, no SQLite binary bui
 
 ## Custom Fonts
 
-Drop `.ttf`, `.otf`, `.woff`, or `.woff2` files into `fonts/`, then restart TodoLite or reopen settings. They'll appear in the font selector.
+Drop `.ttf`, `.otf`, `.woff`, or `.woff2` files into `fonts/`. They appear in the font dropdown under "project" alongside system fonts.
+
+## Settings
+
+Widget and panel have independent glass settings:
+
+| Setting | Widget default | Panel default |
+|---------|---------------|---------------|
+| Glass opacity | 0.14 | 0.20 |
+| Blur | 36px | 18px |
+| Corner radius | 24px | 22px |
+
+Widget is designed to blend into the desktop wallpaper. Panel is designed to be a clean, lighter overlay.
 
 ## What's Done
 
@@ -101,9 +121,12 @@ Drop `.ttf`, `.otf`, `.woff`, or `.woff2` files into `fonts/`, then restart Todo
 - [x] Minimal data model (content, ddl, detail only)
 - [x] Completion by location (active → completed[date])
 - [x] Desktop widget with checkbox, content, DDL, expandable detail
-- [x] Completion animation: flowing line sweep + collapse
+- [x] Completion animation: dark-gray line sweep + collapse
+- [x] Widget embedded wallpaper effect (ultra-low opacity glass)
 - [x] Panel: Tasks page with active + completed-by-date sections
-- [x] Panel: Settings page (font, size, glass, blur, radius, layer)
+- [x] Panel: independent widget/panel glass settings
+- [x] Panel: macOS traffic light buttons (close / minimize / fullscreen)
+- [x] System font scanning + searchable glass-styled font dropdown
 - [x] Custom font injection from `fonts/` directory
 - [x] System tray with click-to-toggle panel
 - [x] iOS 26 liquid-glass aesthetic (backdrop-filter, radial highlights, grain texture)

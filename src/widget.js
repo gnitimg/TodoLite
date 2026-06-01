@@ -9,21 +9,20 @@ const content = document.getElementById('content');
 const ddl = document.getElementById('ddl');
 const detail = document.getElementById('detail');
 
-function toLocalInput(value) {
-  return (value || '').replace(' ', 'T');
-}
-
-function fromLocalInput(value) {
-  return (value || '').replace('T', ' ');
-}
+function toLocalInput(value) { return (value || '').replace(' ', 'T'); }
+function fromLocalInput(value) { return (value || '').replace('T', ' '); }
 
 function applySettings(s) {
   settings = s || {};
-  document.documentElement.style.setProperty('--font-size', `${settings.fontSize || 14}px`);
-  document.documentElement.style.setProperty('--opacity', settings.glassOpacity ?? .34);
-  document.documentElement.style.setProperty('--blur', `${settings.blurStrength || 28}px`);
-  document.documentElement.style.setProperty('--radius', `${settings.cornerRadius || 28}px`);
-  document.documentElement.style.setProperty('--font-family', settings.fontFamily && settings.fontFamily !== 'system' ? `'${settings.fontFamily}', 'Segoe UI', system-ui, sans-serif` : `Inter, 'Segoe UI', system-ui, sans-serif`);
+  const ws = settings.widget || {};
+  document.documentElement.style.setProperty('--font-size', `${ws.fontSize || 14}px`);
+  document.documentElement.style.setProperty('--opacity', ws.glassOpacity ?? .14);
+  document.documentElement.style.setProperty('--blur', `${ws.blurStrength || 36}px`);
+  document.documentElement.style.setProperty('--radius', `${ws.cornerRadius || 24}px`);
+  document.documentElement.style.setProperty('--font-family',
+    ws.fontFamily && ws.fontFamily !== 'system'
+      ? `'${ws.fontFamily}', 'Segoe UI', system-ui, sans-serif`
+      : `Inter, 'Segoe UI', system-ui, sans-serif`);
 }
 
 function sortItems(items) {

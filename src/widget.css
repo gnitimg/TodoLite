@@ -1,9 +1,13 @@
 .widget {
+  --opacity: .14;
+  --blur: 36px;
+  --line: rgba(255,255,255,.18);
   width: 100vw;
   height: 100vh;
   padding: 18px;
   display: grid;
   grid-template-rows: auto 1fr auto;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 0 -1px 0 rgba(255,255,255,.06);
 }
 header { display: flex; align-items: baseline; justify-content: space-between; padding: 2px 4px 12px; }
 .title { font-weight: 650; letter-spacing: -.02em; }
@@ -27,7 +31,7 @@ header { display: flex; align-items: baseline; justify-content: space-between; p
   left: 0; top: 50%;
   height: 2px;
   width: 100%;
-  background: linear-gradient(90deg, transparent 0%, rgba(60,180,110,.7) 30%, rgba(60,180,110,.9) 50%, rgba(60,180,110,.7) 70%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(40,40,44,.55) 25%, rgba(40,40,44,.75) 50%, rgba(40,40,44,.55) 75%, transparent 100%);
   transform: translateY(-50%) scaleX(0);
   transform-origin: left center;
   animation: line-sweep .55s cubic-bezier(.4,0,.2,1) forwards;
@@ -36,7 +40,7 @@ header { display: flex; align-items: baseline; justify-content: space-between; p
   border-radius: 1px;
 }
 @keyframes line-sweep {
-  0%   { transform: translateY(-50%) scaleX(0); opacity: .6; }
+  0%   { transform: translateY(-50%) scaleX(0); opacity: .5; }
   70%  { transform: translateY(-50%) scaleX(1); opacity: 1; }
   100% { transform: translateY(-50%) scaleX(1); opacity: 0; }
 }

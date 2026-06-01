@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld('todoLite', {
   openDataFolder: () => ipcRenderer.invoke('folder:open-data'),
   openBackupFolder: () => ipcRenderer.invoke('folder:open-backups'),
   closePanel: () => ipcRenderer.invoke('app:close-panel'),
+  minimizePanel: () => ipcRenderer.invoke('app:minimize-panel'),
+  fullscreenPanel: () => ipcRenderer.invoke('app:fullscreen-panel'),
   quit: () => ipcRenderer.invoke('app:quit'),
   onTodosChanged: cb => ipcRenderer.on('todos:changed', (_, data) => cb(data)),
   onSettingsChanged: cb => ipcRenderer.on('settings:changed', (_, data) => cb(data))
