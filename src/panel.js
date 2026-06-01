@@ -21,6 +21,13 @@ const accentPicker = document.getElementById('accentPicker');
 const accentDot = document.getElementById('accentDot');
 const accentText = document.getElementById('accentText');
 const accentPresets = document.getElementById('accentPresets');
+const accentWheel = document.getElementById('accentWheel');
+const accentThumb = document.getElementById('accentThumb');
+const accentPreview = document.getElementById('accentPreview');
+const accentHexInput = document.getElementById('accentHexInput');
+const accentDialogDot = document.getElementById('accentDialogDot');
+
+let pendingAccentColor = '#5f8cff';
 
 const startupToggle = document.getElementById('startupToggle');
 const startupText = document.getElementById('startupText');
@@ -181,6 +188,118 @@ function hexToRgb(hex) {
   };
 }
 
+function normalizeHex(value) {
+  const raw = String(value || '').trim();
+
+  if (/^#[0-9a-fA-F]{6}$/.test(raw)) {
+    return raw.toLowerCase();
+  }
+
+  if (/^#[0-9a-fA-F]{3}$/.test(raw)) {
+    return `#${raw[1]}${raw[1]}${raw[2]}${raw[2]}${raw[3]}${raw[3]}`.toLowerCase();
+  }
+
+  return '#5f8cff';
+}
+
+function hslToHex(h, s = 88, l = 62) {
+  s /= 100;
+  l /= 100;
+
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const hp = h / 60;
+  const x = c * (1 - Math.abs((hp % 2) - 1));
+
+  let r = 0;
+  let g = 0;
+  let b = 0;
+
+  if (hp >= 0 && hp < 1) [r, g, b] = [c, x, 0];
+  else if (hp >= 1 && hp < 2) [r, g, b] = [x, c, 0];
+  else if (hp >= 2 && hp < 3) [r, g, b] = [0, c, x];
+  else if (hp >= 3 && hp < 4) [r, g, b] = [0, x, c];
+  else if (hp >= 4 && hp < 5) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+
+  const m = l - c / 2;
+
+  const toHex = n => Math.round((n + m) * 255)
+    .toString(16)
+    .padStart(2, '0');
+
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function hexToHue(hex) {
+  const { r, g, b } = hexToRgb(normalizeHex(hex));
+
+  const rn = r / 255;
+  const gn = g / 255;
+  const bn = b / 255;
+
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const d = max - min;
+
+  if (d === 0) return 220;
+
+  let h;
+
+  if (max === rn) h = ((gn - bn) / d) % 6;
+  else if (max === gn) h = (bn - rn) / d + 2;
+  else h = (rn - gn) / d + 4;
+
+  return Math.round((h * 60 + 360) % 360);
+}
+
+function syncAccentDialog(color) {
+  const normalized = normalizeHex(color);
+
+  pendingAccentColor = normalized;
+
+  if (accentPicker) accentPicker.value = normalized;
+  if (accentDot) accentDot.style.background = normalized;
+  if (accentText) accentText.textContent = normalized;
+  if (accentPreview) accentPreview.style.background = normalized;
+  if (accentDialogDot) accentDialogDot.style.background = normalized;
+  if (accentHexInput && accentHexInput.value !== normalized) accentHexInput.value = normalized;
+
+  const { r, g, b } = hexToRgb(normalized);
+  document.documentElement.style.setProperty('--accent', normalized);
+  document.documentElement.style.setProperty('--accent-rgb', `${r}, ${g}, ${b}`);
+
+  if (!accentThumb || !accentWheel) return;
+
+  const hue = hexToHue(normalized);
+  const angle = (hue - 90) * Math.PI / 180;
+  const radius = 82;
+
+  accentThumb.style.left = `${110 + Math.cos(angle) * radius}px`;
+  accentThumb.style.top = `${110 + Math.sin(angle) * radius}px`;
+  accentThumb.style.background = normalized;
+}
+
+function pickAccentFromPoint(clientX, clientY) {
+  if (!accentWheel) return;
+
+  const rect = accentWheel.getBoundingClientRect();
+
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+
+  const dx = clientX - cx;
+  const dy = clientY - cy;
+
+  const distance = Math.sqrt(dx * dx + dy * dy);
+
+  if (distance < 46 || distance > 120) return;
+
+  const angle = Math.atan2(dy, dx);
+  const hue = Math.round((angle * 180 / Math.PI + 90 + 360) % 360);
+
+  syncAccentDialog(hslToHex(hue));
+}
+
 function setSurfaceVars(target, surface, global) {
   const opacity = clamp01(surface.glassOpacity ?? .2);
   const blur = clamp100(surface.blurStrength ?? 18);
@@ -296,13 +415,8 @@ function updateWidgetLayerSelected() {
 }
 
 function updateAccentSelected() {
-  if (!accentDot || !accentText || !accentPicker) return;
-
-  const color = settings.global?.accentColor || '#5f8cff';
-
-  accentDot.style.background = color;
-  accentText.textContent = color;
-  accentPicker.value = color;
+  const color = normalizeHex(settings.global?.accentColor || '#5f8cff');
+  syncAccentDialog(color);
 }
 
 function updateStartupSelected() {
@@ -734,17 +848,47 @@ function initAccentPicker() {
 
   for (const color of accentPresetValues) {
     const btn = document.createElement('button');
+
     btn.type = 'button';
     btn.className = 'accent-preset';
     btn.style.background = color;
-    btn.onclick = () => {
-      accentPicker.value = color;
+
+    btn.onclick = event => {
+      event.preventDefault();
+      syncAccentDialog(color);
     };
+
     accentPresets.appendChild(btn);
   }
 
+  let wheelDragging = false;
+
+  accentWheel?.addEventListener('pointerdown', event => {
+    wheelDragging = true;
+    accentWheel.setPointerCapture?.(event.pointerId);
+    pickAccentFromPoint(event.clientX, event.clientY);
+  });
+
+  accentWheel?.addEventListener('pointermove', event => {
+    if (!wheelDragging) return;
+    pickAccentFromPoint(event.clientX, event.clientY);
+  });
+
+  accentWheel?.addEventListener('pointerup', event => {
+    wheelDragging = false;
+    accentWheel.releasePointerCapture?.(event.pointerId);
+  });
+
+  accentHexInput?.addEventListener('input', () => {
+    const value = accentHexInput.value.trim();
+
+    if (/^#[0-9a-fA-F]{6}$/.test(value) || /^#[0-9a-fA-F]{3}$/.test(value)) {
+      syncAccentDialog(value);
+    }
+  });
+
   accentTrigger.onclick = () => {
-    accentPicker.value = settings.global?.accentColor || '#5f8cff';
+    syncAccentDialog(settings.global?.accentColor || '#5f8cff');
     accentDialog.showModal();
   };
 
@@ -757,7 +901,7 @@ function initAccentPicker() {
 
     const next = await window.todoLite.updateSettings({
       global: {
-        accentColor: accentPicker.value
+        accentColor: pendingAccentColor
       }
     });
 

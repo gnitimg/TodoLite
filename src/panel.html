@@ -49,8 +49,50 @@
       <div class="data-actions no-drag"><button id="openData" data-i18n="openData">打开数据</button><button id="openBackups" data-i18n="openBackups">打开备份</button></div>
     </section>
   </main>
-  <dialog id="editor" class="glass no-drag"><form method="dialog" id="form"><input id="content" placeholder="内容" autocomplete="off" /><input id="ddl" class="ddl-picker-input" placeholder="DDL" readonly /><textarea id="detail" placeholder="详情，可选"></textarea><div class="dialog-actions"><button value="cancel" type="button" id="deleteBtn" class="danger" data-i18n="remove">移除</button><div class="grow"></div><button value="cancel" type="button" id="cancelBtn" data-i18n="cancel">取消</button><button value="ok" type="submit" data-i18n="save">保存</button></div></form></dialog>
-  <dialog id="accentDialog" class="glass accent-dialog no-drag"><form method="dialog" id="accentForm"><div class="dialog-title" data-i18n="accentColor">主题色</div><input id="accentPicker" class="accent-picker" type="color" value="#5f8cff" /><div class="accent-presets" id="accentPresets"></div><div class="dialog-actions"><div class="grow"></div><button value="cancel" type="button" id="accentCancel" data-i18n="cancel">取消</button><button value="ok" type="submit" data-i18n="save">保存</button></div></form></dialog>
+
+  <dialog id="editor" class="glass no-drag">
+    <form method="dialog" id="form">
+      <input id="content" placeholder="内容" autocomplete="off" />
+      <input id="ddl" class="ddl-picker-input" placeholder="DDL" readonly />
+      <textarea id="detail" placeholder="详情，可选"></textarea>
+      <div class="dialog-actions">
+        <button value="cancel" type="button" id="deleteBtn" class="danger" data-i18n="remove">移除</button>
+        <div class="grow"></div>
+        <button value="cancel" type="button" id="cancelBtn" data-i18n="cancel">取消</button>
+        <button value="ok" type="submit" data-i18n="save">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="accentDialog" class="glass accent-dialog no-drag">
+    <form method="dialog" id="accentForm" class="accent-form">
+      <div class="dialog-title" data-i18n="accentColor">主题色</div>
+
+      <input id="accentPicker" type="hidden" value="#5f8cff" />
+
+      <div class="accent-wheel-wrap">
+        <div class="accent-wheel" id="accentWheel">
+          <div class="accent-wheel-inner">
+            <div class="accent-preview" id="accentPreview"></div>
+          </div>
+          <div class="accent-thumb" id="accentThumb"></div>
+        </div>
+      </div>
+
+      <div class="accent-value-row">
+        <span class="accent-value-dot" id="accentDialogDot"></span>
+        <input id="accentHexInput" class="accent-hex-input" value="#5f8cff" maxlength="7" autocomplete="off" />
+      </div>
+      <div class="accent-presets" id="accentPresets"></div>
+
+      <div class="dialog-actions">
+        <div class="grow"></div>
+        <button value="cancel" type="button" id="accentCancel" data-i18n="cancel">取消</button>
+        <button value="ok" type="submit" data-i18n="save">保存</button>
+      </div>
+    </form>
+  </dialog>
+  
   <script src="panel.js"></script>
   <script src="motion_patch.js"></script>
 </body>
