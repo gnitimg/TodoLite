@@ -54,8 +54,11 @@ function render() {
     row.querySelector('.ddl').textContent = item.ddl;
     row.querySelector('.check').onclick = async event => {
       event.stopPropagation();
-      row.classList.add('done-fade');
-      setTimeout(() => window.todoLite.completeTodo(item.id), 180);
+      row.classList.add('done-sweep');
+      setTimeout(() => {
+        row.classList.add('done-fade');
+        setTimeout(() => window.todoLite.completeTodo(item.id), 340);
+      }, 550);
     };
     row.querySelector('.content').onclick = () => row.classList.toggle('open');
     row.querySelector('.content').ondblclick = () => openEditor(item);
