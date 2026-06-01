@@ -1,5 +1,11 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+function subscribe(channel, cb) {
+  const listener = (_, data) => cb(data);
+  ipcRenderer.on(channel, listener);
+  return () => ipcRenderer.removeListener(channel, listener);
+}
+
 contextBridge.exposeInMainWorld('todoLite', {
   getTodos: () => ipcRenderer.invoke('todos:get'),
   addTodo: todo => ipcRenderer.invoke('todos:add', todo),
@@ -23,18 +29,7 @@ contextBridge.exposeInMainWorld('todoLite', {
 
   quit: () => ipcRenderer.invoke('app:quit'),
 
-  onTodosChanged: cb => {
-    ipcRenderer.removeAllListeners('todos:changed');
-    ipcRenderer.on('todos:changed', (_, data) => cb(data));
-  },
-
-  onSettingsChanged: cb => {
-    ipcRenderer.removeAllListeners('settings:changed');
-    ipcRenderer.on('settings:changed', (_, data) => cb(data));
-  },
-
-  onPanelFullscreenChanged: cb => {
-    ipcRenderer.removeAllListeners('panel:maximize-changed');
-    ipcRenderer.on('panel:maximize-changed', (_, value) => cb(value));
-  }
+  onTodosChanged: cb => subscribe('todos:changed', cb),
+  onSettingsChanged: cb => subscribe('settings:changed', cb),
+  onPanelFullscreenChanged: cb => subscribe('panel:maximize-changed', cb)
 });

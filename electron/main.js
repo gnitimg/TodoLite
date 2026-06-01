@@ -286,6 +286,22 @@ function getWidgetLayer() {
   return settings.widget?.layer || 'desktop';
 }
 
+function enforceWidgetTrayOnly() {
+  if (!widgetWindow || widgetWindow.isDestroyed()) return;
+
+  widgetWindow.setSkipTaskbar(true);
+
+  setTimeout(() => {
+    if (!widgetWindow || widgetWindow.isDestroyed()) return;
+    widgetWindow.setSkipTaskbar(true);
+  }, 80);
+
+  setTimeout(() => {
+    if (!widgetWindow || widgetWindow.isDestroyed()) return;
+    widgetWindow.setSkipTaskbar(true);
+  }, 260);
+}
+
 function applyWidgetLayer(settings) {
   const layer = settings.widget?.layer || 'desktop';
 
@@ -297,6 +313,7 @@ function applyWidgetLayer(settings) {
     widgetWindow.setFocusable(true);
     widgetWindow.setAlwaysOnTop(true, 'screen-saver');
     widgetWindow.show();
+    enforceWidgetTrayOnly();
     return;
   }
 
@@ -305,18 +322,21 @@ function applyWidgetLayer(settings) {
   if (layer === 'normal') {
     widgetWindow.setFocusable(true);
     widgetWindow.show();
+    enforceWidgetTrayOnly();
     return;
   }
 
-  // desktop: 最低干扰层，只控制小 Todo。
+  // desktop：最低干扰层，只控制小 TodoList。
   // 纯 Electron 无法稳定挂到 WorkerW 桌面层，这里尽量避免抢焦点和任务栏出现。
   widgetWindow.setFocusable(false);
   widgetWindow.showInactive();
+  enforceWidgetTrayOnly();
 
   setTimeout(() => {
     if (!widgetWindow || widgetWindow.isDestroyed()) return;
     widgetWindow.setFocusable(true);
     widgetWindow.blur();
+    enforceWidgetTrayOnly();
   }, 260);
 }
 
@@ -459,6 +479,9 @@ function createWindows() {
     applyWidgetLayer(settings);
   });
 
+  widgetWindow.on('show', enforceWidgetTrayOnly);
+  widgetWindow.on('focus', enforceWidgetTrayOnly);
+  widgetWindow.on('restore', enforceWidgetTrayOnly);
   widgetWindow.on('moved', () => debounceSaveBounds('widget'));
   widgetWindow.on('resized', () => debounceSaveBounds('widget'));
 
@@ -469,6 +492,7 @@ function createWindows() {
         if (!widgetWindow || widgetWindow.isDestroyed()) return;
         widgetWindow.showInactive();
         widgetWindow.blur();
+        enforceWidgetTrayOnly();
       }, 80);
     }
   });
@@ -479,6 +503,7 @@ function createWindows() {
         if (!widgetWindow || widgetWindow.isDestroyed()) return;
         widgetWindow.showInactive();
         widgetWindow.blur();
+        enforceWidgetTrayOnly();
       }, 120);
     }
   });
@@ -533,7 +558,17 @@ function createTray() {
     { label: 'Open TodoLite', click: showPanel },
     {
       label: 'Show / Hide Desktop Layer',
-      click: () => widgetWindow?.isVisible() ? widgetWindow.hide() : widgetWindow.showInactive()
+      click: () => {
+        if (!widgetWindow) return;
+
+        if (widgetWindow.isVisible()) {
+          widgetWindow.hide();
+          return;
+        }
+
+        widgetWindow.showInactive();
+        enforceWidgetTrayOnly();
+      }
     },
     { type: 'separator' },
     {
@@ -546,29 +581,60 @@ function createTray() {
   ]));
 }
 
-function scanProjectFonts() {
+function fontNameFromFile(fileName) {
+  return path.parse(fileName).name
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function scanFontDir(dir, system = false) {
   try {
-    return fs.readdirSync(fontsDir, { withFileTypes: true })
+    if (!fs.existsSync(dir)) return [];
+
+    return fs.readdirSync(dir, { withFileTypes: true })
       .filter(f => f.isFile() && /\.(ttf|otf|woff|woff2)$/i.test(f.name))
-      .map(f => ({
-        name: path.parse(f.name).name,
-        file: f.name,
-        url: `file://${path.join(fontsDir, f.name).replace(/\\/g, '/')}`,
-        system: false
-      }))
+      .map(f => {
+        const fullPath = path.join(dir, f.name);
+
+        return {
+          name: fontNameFromFile(f.name),
+          file: f.name,
+          url: `file://${fullPath.replace(/\\/g, '/')}`,
+          system
+        };
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
   } catch {
     return [];
   }
 }
 
+function scanProjectFonts() {
+  return scanFontDir(fontsDir, false);
+}
+
+function scanWindowsFonts() {
+  if (process.platform !== 'win32') return [];
+
+  const winDir = process.env.WINDIR || 'C:\\Windows';
+  const systemFontsDir = path.join(winDir, 'Fonts');
+
+  return scanFontDir(systemFontsDir, true);
+}
+
 ipcMain.handle('todos:get', () => readJson(todosPath, baseTodoData()));
+
 ipcMain.handle('settings:get', () => {
   const settings = mergeSettings(readJson(settingsPath, defaultSettings));
   settings.global.startup = getStartupStateFromSystem();
   return settings;
 });
-ipcMain.handle('fonts:list', () => ({ project: scanProjectFonts(), system: [] }));
+
+ipcMain.handle('fonts:list', () => ({
+  project: scanProjectFonts(),
+  system: scanWindowsFonts()
+}));
 
 ipcMain.handle('todos:add', (_, todo) => {
   const data = readJson(todosPath, baseTodoData());
