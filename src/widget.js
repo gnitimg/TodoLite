@@ -226,6 +226,20 @@ function updateLiquidSpot(event) {
   widget.style.setProperty('--spot-y', `${y}%`);
 }
 
+function bindGlowLifecycle(surface) {
+  if (!surface) return;
+
+  surface.classList.add('is-idle');
+
+  surface.addEventListener('pointerenter', () => {
+    surface.classList.remove('is-idle');
+  });
+
+  surface.addEventListener('pointerleave', () => {
+    surface.classList.add('is-idle');
+  });
+}
+
 form.onsubmit = async event => {
   event.preventDefault();
 
@@ -302,5 +316,6 @@ function injectProjectFonts(list) {
   settings = await window.todoLite.getSettings();
 
   applySettings(settings);
+  bindGlowLifecycle(widget);
   render();
 })();

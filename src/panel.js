@@ -22,6 +22,9 @@ const accentDot = document.getElementById('accentDot');
 const accentText = document.getElementById('accentText');
 const accentPresets = document.getElementById('accentPresets');
 
+const startupToggle = document.getElementById('startupToggle');
+const startupText = document.getElementById('startupText');
+
 const accentPresetValues = [
   '#5f8cff',
   '#8b5cf6',
@@ -50,10 +53,13 @@ const i18n = {
     fontSize: '字号',
     language: '语言',
     accentColor: '主题色',
+    startup: '开机启动',
+    on: '开启',
+    off: '关闭',
     opacity: '透明度',
     blur: '雾化',
     radius: '圆角',
-    layer: '层级',
+    layer: '小窗口层级',
     openData: '打开数据',
     openBackups: '打开备份',
     remove: '移除',
@@ -81,10 +87,13 @@ const i18n = {
     fontSize: 'Font size',
     language: 'Language',
     accentColor: 'Accent color',
+    startup: 'Launch at startup',
+    on: 'On',
+    off: 'Off',
     opacity: 'Opacity',
     blur: 'Haze',
     radius: 'Radius',
-    layer: 'Layer',
+    layer: 'Widget layer',
     openData: 'open data',
     openBackups: 'open backups',
     remove: 'remove',
@@ -103,7 +112,7 @@ const languageOptions = [
   { value: 'en-US', label: 'English' }
 ];
 
-const windowLevelOptions = [
+const widgetLayerOptions = [
   { value: 'desktop', label: 'desktop' },
   { value: 'normal', label: 'normal' },
   { value: 'topmost', label: 'topmost' }
@@ -236,8 +245,9 @@ function syncSettingsUI() {
 
   updateFontSelected();
   updateLanguageSelected();
-  updateWindowLevelSelected();
+  updateWidgetLayerSelected();
   updateAccentSelected();
+  updateStartupSelected();
 }
 
 function setVal(id, val) {
@@ -262,18 +272,30 @@ function updateLanguageSelected() {
   document.getElementById('languageSelected').textContent = option.label;
 }
 
-function updateWindowLevelSelected() {
-  const value = settings.windowLevel || 'desktop';
-  const option = windowLevelOptions.find(item => item.value === value) || windowLevelOptions[0];
+function updateWidgetLayerSelected() {
+  const value = settings.widget?.layer || 'desktop';
+  const option = widgetLayerOptions.find(item => item.value === value) || widgetLayerOptions[0];
   document.getElementById('windowLevelSelected').textContent = option.label;
 }
 
 function updateAccentSelected() {
+  if (!accentDot || !accentText || !accentPicker) return;
+
   const color = settings.global?.accentColor || '#5f8cff';
 
   accentDot.style.background = color;
   accentText.textContent = color;
   accentPicker.value = color;
+}
+
+function updateStartupSelected() {
+  if (!startupToggle || !startupText) return;
+
+  const enabled = Boolean(settings.global?.startup);
+
+  startupToggle.classList.toggle('active', enabled);
+  startupToggle.setAttribute('aria-pressed', String(enabled));
+  startupText.textContent = enabled ? t('on') : t('off');
 }
 
 function injectProjectFonts(list) {
@@ -513,7 +535,23 @@ function updateLiquidSpot(event) {
   panel.style.setProperty('--spot-y', `${y}%`);
 }
 
+function bindGlowLifecycle(surface) {
+  if (!surface) return;
+
+  surface.classList.add('is-idle');
+
+  surface.addEventListener('pointerenter', () => {
+    surface.classList.remove('is-idle');
+  });
+
+  surface.addEventListener('pointerleave', () => {
+    surface.classList.add('is-idle');
+  });
+}
+
 function initAccentPicker() {
+  if (!accentTrigger || !accentDialog || !accentForm) return;
+
   accentPresets.innerHTML = '';
 
   for (const color of accentPresetValues) {
@@ -547,6 +585,22 @@ function initAccentPicker() {
 
     applySettings(next);
     accentDialog.close();
+  };
+}
+
+function initStartupToggle() {
+  if (!startupToggle) return;
+
+  startupToggle.onclick = async () => {
+    const current = Boolean(settings.global?.startup);
+
+    const next = await window.todoLite.updateSettings({
+      global: {
+        startup: !current
+      }
+    });
+
+    applySettings(next);
   };
 }
 
@@ -617,6 +671,8 @@ for (const [id, path] of [
 ]) {
   const el = document.getElementById(id);
 
+  if (!el) continue;
+
   el.oninput = async event => {
     const [section, key] = path.split('.');
 
@@ -660,6 +716,8 @@ window.todoLite.onPanelFullscreenChanged(isFull => {
   applySettings(settings);
   initFontDropdown();
   initAccentPicker();
+  initStartupToggle();
+  bindGlowLifecycle(panel);
 
   initLiquidSelect({
     rootId: 'languageDropdown',
@@ -682,11 +740,13 @@ window.todoLite.onPanelFullscreenChanged(isFull => {
     rootId: 'windowLevelDropdown',
     triggerId: 'windowLevelSelected',
     listId: 'windowLevelList',
-    options: windowLevelOptions,
-    getValue: () => settings.windowLevel || 'desktop',
+    options: widgetLayerOptions,
+    getValue: () => settings.widget?.layer || 'desktop',
     onChange: async value => {
       const next = await window.todoLite.updateSettings({
-        windowLevel: value
+        widget: {
+          layer: value
+        }
       });
       applySettings(next);
     }

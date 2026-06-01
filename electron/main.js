@@ -16,13 +16,15 @@ const defaultSettings = {
     fontFamily: 'system',
     fontSize: 14,
     language: 'zh-CN',
-    accentColor: '#5f8cff'
+    accentColor: '#5f8cff',
+    startup: false
   },
   widget: {
     glassOpacity: 0.14,
     blurStrength: 36,
     cornerRadius: 24,
     sortByDdl: false,
+    layer: 'desktop',
     bounds: {
       width: 430,
       height: 340,
@@ -89,6 +91,7 @@ function cleanUndefined(obj) {
 function migrateSettings(raw = {}) {
   const oldFontFamily = raw.fontFamily || raw.global?.fontFamily || raw.widget?.fontFamily || raw.panel?.fontFamily;
   const oldFontSize = raw.fontSize || raw.global?.fontSize || raw.widget?.fontSize || raw.panel?.fontSize;
+  const oldWindowLevel = raw.windowLevel || raw.widget?.layer || defaultSettings.widget.layer;
 
   const migrated = {
     ...defaultSettings,
@@ -99,13 +102,15 @@ function migrateSettings(raw = {}) {
       fontFamily: oldFontFamily || defaultSettings.global.fontFamily,
       fontSize: oldFontSize || defaultSettings.global.fontSize,
       language: raw.global?.language || raw.language || defaultSettings.global.language,
-      accentColor: raw.global?.accentColor || raw.accentColor || defaultSettings.global.accentColor
+      accentColor: raw.global?.accentColor || raw.accentColor || defaultSettings.global.accentColor,
+      startup: Boolean(raw.global?.startup ?? raw.startup ?? defaultSettings.global.startup)
     },
     widget: {
       ...defaultSettings.widget,
       ...(raw.widget || {}),
       fontFamily: undefined,
       fontSize: undefined,
+      layer: raw.widget?.layer || oldWindowLevel,
       bounds: {
         ...defaultSettings.widget.bounds,
         ...((raw.widget || {}).bounds || {})
@@ -121,7 +126,7 @@ function migrateSettings(raw = {}) {
         ...((raw.panel || {}).bounds || {})
       }
     },
-    windowLevel: raw.windowLevel || defaultSettings.windowLevel
+    windowLevel: undefined
   };
 
   return cleanUndefined(migrated);
@@ -158,7 +163,7 @@ function mergeSettings(current = {}, patch = {}) {
         ...((patch.panel || {}).bounds || {})
       }
     },
-    windowLevel: patch.windowLevel ?? base.windowLevel ?? defaultSettings.windowLevel
+    windowLevel: undefined
   };
 
   return cleanUndefined(merged);
@@ -254,28 +259,52 @@ function broadcastSettings() {
   panelWindow?.webContents.send('settings:changed', settings);
 }
 
-function applyWindowLevel(settings) {
-  const level = settings.windowLevel || 'desktop';
+function applyStartup(enabled) {
+  const openAtLogin = Boolean(enabled);
 
-  if (widgetWindow) {
-    widgetWindow.setSkipTaskbar(true);
+  try {
+    app.setLoginItemSettings({
+      openAtLogin,
+      openAsHidden: false,
+      path: process.execPath
+    });
+  } catch {
+    // Dev mode or portable environments may fail silently.
+  }
+}
 
-    if (level === 'topmost') {
-      widgetWindow.setAlwaysOnTop(true, 'screen-saver');
-    } else {
-      widgetWindow.setAlwaysOnTop(false);
-    }
+function getStartupStateFromSystem() {
+  try {
+    return Boolean(app.getLoginItemSettings().openAtLogin);
+  } catch {
+    return false;
+  }
+}
+
+function applyWidgetLayer(settings) {
+  const layer = settings.widget?.layer || 'desktop';
+
+  if (!widgetWindow) return;
+
+  widgetWindow.setSkipTaskbar(true);
+
+  if (layer === 'topmost') {
+    widgetWindow.setAlwaysOnTop(true, 'screen-saver');
+    widgetWindow.show();
+    return;
   }
 
-  if (panelWindow) {
-    if (level === 'topmost') {
-      panelWindow.setAlwaysOnTop(true, 'screen-saver');
-    } else {
-      panelWindow.setAlwaysOnTop(false);
-    }
+  widgetWindow.setAlwaysOnTop(false);
 
-    panelWindow.setSkipTaskbar(level === 'desktop');
+  if (layer === 'normal') {
+    widgetWindow.show();
+    return;
   }
+
+  // desktop = 最低干扰层：只控制小 Todo，不控制主面板。
+  // Electron 无法纯原生稳定嵌入 WorkerW 桌面层，这里先做“桌面小组件近似层”：
+  // 不进任务栏、不置顶、不影响主面板。
+  widgetWindow.showInactive();
 }
 
 function saveBounds(kind) {
@@ -380,7 +409,7 @@ function createWindows() {
     panelWindow?.webContents.send('panel:maximize-changed', false);
   });
 
-  applyWindowLevel(settings);
+  applyWidgetLayer(settings);
 }
 
 function createTray() {
@@ -442,7 +471,11 @@ function scanProjectFonts() {
 }
 
 ipcMain.handle('todos:get', () => readJson(todosPath, baseTodoData()));
-ipcMain.handle('settings:get', () => mergeSettings(readJson(settingsPath, defaultSettings)));
+ipcMain.handle('settings:get', () => {
+  const settings = mergeSettings(readJson(settingsPath, defaultSettings));
+  settings.global.startup = getStartupStateFromSystem();
+  return settings;
+});
 ipcMain.handle('fonts:list', () => ({ project: scanProjectFonts(), system: [] }));
 
 ipcMain.handle('todos:add', (_, todo) => {
@@ -572,7 +605,8 @@ ipcMain.handle('settings:update', (_, patch) => {
   const settings = mergeSettings(current, patch || {});
 
   atomicWriteJson(settingsPath, settings, false);
-  applyWindowLevel(settings);
+  applyStartup(settings.global?.startup);
+  applyWidgetLayer(settings);
   broadcastSettings();
 
   return settings;
@@ -609,6 +643,10 @@ ipcMain.handle('app:quit', () => {
 app.whenReady().then(() => {
   resolvePaths();
   ensureDataFiles();
+
+  const settings = mergeSettings(readJson(settingsPath, defaultSettings));
+  applyStartup(settings.global?.startup);
+
   createWindows();
   createTray();
 });
