@@ -5,31 +5,63 @@
   --edge-glow-y: var(--spot-y, 0%);
 }
 
+/* 真正的鼠标圆形光效，只存在于 ::before */
 .glass::before {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  z-index: 0;
+
+  background:
+    radial-gradient(
+      var(--glow-size) circle at var(--spot-x) var(--spot-y),
+      rgba(255,255,255,.92) 0%,
+      rgba(255,255,255,.58) 18%,
+      rgba(255,255,255,.26) 38%,
+      rgba(255,255,255,.08) 56%,
+      transparent 74%
+    );
+
+  opacity: 0;
+  filter: blur(18px);
+  transform: scale(1.08);
+  mix-blend-mode: screen;
+
   transition:
-    opacity .9s cubic-bezier(.2,.8,.2,1),
-    filter .9s cubic-bezier(.2,.8,.2,1),
-    background .18s ease !important;
+    opacity 1.45s cubic-bezier(.18,.82,.18,1),
+    filter 1.45s cubic-bezier(.18,.82,.18,1),
+    transform 1.45s cubic-bezier(.18,.82,.18,1),
+    background .12s ease;
 }
 
+/* 鼠标进入：圆形光效快速出现 */
 .glass.motion-lit::before,
 .glass.is-lit::before {
   opacity: 1 !important;
   filter: blur(0) !important;
+  transform: scale(1) !important;
+
   transition:
     opacity .12s ease,
     filter .12s ease,
-    background .12s ease !important;
+    transform .12s ease,
+    background .08s ease !important;
 }
 
+/* 鼠标离开：圆形光效停在离开边缘，逐渐扩散消失 */
 .glass.motion-idle::before,
 .glass.is-idle::before {
   opacity: 0 !important;
-  filter: blur(24px) !important;
+  filter: blur(28px) !important;
+  transform: scale(1.22) !important;
+
   transition:
     opacity 1.65s cubic-bezier(.18,.82,.18,1),
     filter 1.65s cubic-bezier(.18,.82,.18,1),
-    background .18s ease !important;
+    transform 1.65s cubic-bezier(.18,.82,.18,1),
+    background .12s ease !important;
 }
 
 .glass.motion-lit::after,
