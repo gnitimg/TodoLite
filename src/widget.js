@@ -315,7 +315,7 @@ function render() {
   previousActiveIds = new Set(active.map(i => i.id));
 }
 
-// 流动排序动画：半卡位移 + 新卡片渐变 + 依次流动
+// 流动排序动画：WAAPI 弹簧流动
 function animateSort() {
   const active = todos.active || [];
   if (!active.length) {
@@ -334,22 +334,21 @@ function animateSort() {
     firstRects.set(row.dataset.id, row.getBoundingClientRect());
   }
 
-  // 移除已不在列表中的卡片（完成/删除）
+  // 移除已不在列表中的卡片
   for (const row of rows) {
     if (!sortedIds.has(row.dataset.id)) {
-      row.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-      row.style.opacity = '0';
-      row.style.transform = 'translateY(-10px) scale(0.95)';
-      setTimeout(() => row.remove(), 300);
+      row.animate([
+        { opacity: 1, transform: 'translateY(0) scale(1)', offset: 0 },
+        { opacity: 0, transform: 'translateY(-8px) scale(0.96)', offset: 1 }
+      ], { duration: 240, easing: 'ease-in', fill: 'forwards' })
+        .onfinish = () => row.remove();
     }
   }
 
-  // 新增卡片：渐变插入
+  // 新增卡片：插入 DOM
   const newItems = sorted.filter(item => !existingIds.has(item.id));
   for (const item of newItems) {
-    const row = createTodoRow(item);
-    row.classList.add('todo-entering');
-    list.appendChild(row);
+    list.appendChild(createTodoRow(item));
   }
 
   // 重排 DOM 到排序后顺序
@@ -360,8 +359,10 @@ function animateSort() {
   }
   list.appendChild(fragment);
 
-  // 获取新位置，依次流动动画
+  // 获取新位置，WAAPI 流动动画
+  const springEase = 'cubic-bezier(0.34, 1.56, 0.64, 1)';
   const sortedRows = [...list.querySelectorAll('.todo')];
+
   sortedRows.forEach((row, index) => {
     const id = row.dataset.id;
     const isNew = !firstRects.has(id);
@@ -369,56 +370,33 @@ function animateSort() {
     const newRect = row.getBoundingClientRect();
 
     if (isNew) {
-      // 新卡片：渐变进入动画（CSS todo-entering 处理）
-      row.style.transition = 'none';
-      row.style.opacity = '0';
-      row.style.transform = 'translateY(20px) scale(0.95)';
-      const delay = index * 60;
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          row.style.transition = 'opacity 0.4s cubic-bezier(.2,.8,.2,1), transform 0.4s cubic-bezier(.2,.8,.2,1)';
-          row.style.opacity = '1';
-          row.style.transform = '';
-          setTimeout(() => {
-            row.style.transition = '';
-            row.classList.remove('todo-entering');
-          }, 420);
-        }, delay);
-      });
+      // 新卡片：从下方弹入
+      row.animate([
+        { opacity: 0, transform: 'translateY(16px) scale(0.96)', filter: 'blur(3px)' },
+        { opacity: 1, transform: 'translateY(0) scale(1)', filter: 'blur(0)' }
+      ], {
+        duration: 360,
+        delay: index * 40,
+        easing: springEase,
+        fill: 'forwards'
+      }).onfinish = () => { row.style.opacity = ''; };
     } else if (oldRect) {
-      // 已有卡片：半卡位移到过渡位置，再流动到最终位置
-      const halfCard = (oldRect.height / 2) + 4;
       const dy = oldRect.top - newRect.top;
       const dx = oldRect.left - newRect.left;
 
       if (Math.abs(dy) < 1 && Math.abs(dx) < 1) return;
 
-      // 卡片中间位置（半卡偏移）
-      const midDy = dy > 0 ? dy - halfCard : dy + halfCard;
-
-      // Invert: 移到旧位置
-      row.style.transition = 'none';
-      row.style.transform = `translate(${dx}px, ${dy}px)`;
-      row.style.zIndex = '10';
-
-      const delay = index * 60;
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          // 第一阶段：流动到半卡位置
-          row.style.transition = 'transform 0.25s cubic-bezier(.2,.8,.2,1)';
-          row.style.transform = `translate(${dx * 0.2}px, ${midDy}px)`;
-
-          setTimeout(() => {
-            // 第二阶段：流动到最终位置
-            row.style.transition = 'transform 0.3s cubic-bezier(.2,.8,.2,1)';
-            row.style.transform = '';
-            setTimeout(() => {
-              row.style.transition = '';
-              row.style.zIndex = '';
-            }, 320);
-          }, 260);
-        }, delay);
-      });
+      // 弹簧流动：从旧位置弹到新位置，带微小过冲
+      row.animate([
+        { transform: `translate(${dx}px, ${dy}px)` },
+        { transform: `translate(${dx * 0.08}px, ${dy * 0.08}px)` },
+        { transform: 'translate(0, 0)' }
+      ], {
+        duration: 450,
+        delay: index * 40,
+        easing: springEase,
+        fill: 'forwards'
+      }).onfinish = () => { row.style.transform = ''; };
     }
   });
 
