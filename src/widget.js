@@ -258,6 +258,45 @@ function removeWithParticles(row, id) {
   }, 520);
 }
 
+function createTodoRow(item) {
+  const row = document.createElement('div');
+  row.className = 'todo no-drag';
+  row.dataset.id = item.id;
+
+  row.innerHTML = `
+    <div class="check" title="done"></div>
+    <div class="content">
+      <div class="content-title"></div>
+      <div class="detail"></div>
+    </div>
+    <div class="ddl"></div>
+  `;
+
+  row.querySelector('.content-title').textContent = item.content;
+  row.querySelector('.detail').textContent = item.detail || '';
+  row.querySelector('.ddl').textContent = item.ddl;
+
+  row.querySelector('.check').onclick = async event => {
+    event.stopPropagation();
+
+    row.classList.add('done-sweep');
+
+    setTimeout(() => {
+      row.classList.add('done-fade');
+
+      setTimeout(() => {
+        window.todoLite.completeTodo(item.id);
+      }, 340);
+    }, 550);
+  };
+
+  row.querySelector('.content').onclick = () => row.classList.toggle('open');
+  row.querySelector('.content').ondblclick = () => openEditor(item);
+  row.oncontextmenu = event => showContextMenu(event, item, row);
+
+  return row;
+}
+
 function render() {
   const active = sortItems(todos.active || []);
 
@@ -265,46 +304,126 @@ function render() {
 
   if (!active.length) {
     list.innerHTML = `<div class="empty">${t('nothingLeft')}</div>`;
+    previousActiveIds = new Set();
     return;
   }
 
   for (const item of active) {
-    const row = document.createElement('div');
-    row.className = 'todo no-drag';
+    list.appendChild(createTodoRow(item));
+  }
 
-    row.innerHTML = `
-      <div class="check" title="done"></div>
-      <div class="content">
-        <div class="content-title"></div>
-        <div class="detail"></div>
-      </div>
-      <div class="ddl"></div>
-    `;
+  previousActiveIds = new Set(active.map(i => i.id));
+}
 
-    row.querySelector('.content-title').textContent = item.content;
-    row.querySelector('.detail').textContent = item.detail || '';
-    row.querySelector('.ddl').textContent = item.ddl;
+// 流动排序动画：半卡位移 + 新卡片渐变 + 依次流动
+function animateSort() {
+  const active = todos.active || [];
+  if (!active.length) {
+    render();
+    return;
+  }
 
-    row.querySelector('.check').onclick = async event => {
-      event.stopPropagation();
+  const sorted = sortItems(active);
+  const rows = [...list.querySelectorAll('.todo')];
+  const existingIds = new Set(rows.map(r => r.dataset.id));
+  const sortedIds = new Set(sorted.map(i => i.id));
 
-      row.classList.add('done-sweep');
+  // First: 捕获已有卡片当前位置
+  const firstRects = new Map();
+  for (const row of rows) {
+    firstRects.set(row.dataset.id, row.getBoundingClientRect());
+  }
 
-      setTimeout(() => {
-        row.classList.add('done-fade');
+  // 移除已不在列表中的卡片（完成/删除）
+  for (const row of rows) {
+    if (!sortedIds.has(row.dataset.id)) {
+      row.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+      row.style.opacity = '0';
+      row.style.transform = 'translateY(-10px) scale(0.95)';
+      setTimeout(() => row.remove(), 300);
+    }
+  }
 
-        setTimeout(() => {
-          window.todoLite.completeTodo(item.id);
-        }, 340);
-      }, 550);
-    };
-
-    row.querySelector('.content').onclick = () => row.classList.toggle('open');
-    row.querySelector('.content').ondblclick = () => openEditor(item);
-    row.oncontextmenu = event => showContextMenu(event, item, row);
-
+  // 新增卡片：渐变插入
+  const newItems = sorted.filter(item => !existingIds.has(item.id));
+  for (const item of newItems) {
+    const row = createTodoRow(item);
+    row.classList.add('todo-entering');
     list.appendChild(row);
   }
+
+  // 重排 DOM 到排序后顺序
+  const fragment = document.createDocumentFragment();
+  for (const item of sorted) {
+    const row = list.querySelector(`.todo[data-id="${item.id}"]`);
+    if (row) fragment.appendChild(row);
+  }
+  list.appendChild(fragment);
+
+  // 获取新位置，依次流动动画
+  const sortedRows = [...list.querySelectorAll('.todo')];
+  sortedRows.forEach((row, index) => {
+    const id = row.dataset.id;
+    const isNew = !firstRects.has(id);
+    const oldRect = firstRects.get(id);
+    const newRect = row.getBoundingClientRect();
+
+    if (isNew) {
+      // 新卡片：渐变进入动画（CSS todo-entering 处理）
+      row.style.transition = 'none';
+      row.style.opacity = '0';
+      row.style.transform = 'translateY(20px) scale(0.95)';
+      const delay = index * 60;
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          row.style.transition = 'opacity 0.4s cubic-bezier(.2,.8,.2,1), transform 0.4s cubic-bezier(.2,.8,.2,1)';
+          row.style.opacity = '1';
+          row.style.transform = '';
+          setTimeout(() => {
+            row.style.transition = '';
+            row.classList.remove('todo-entering');
+          }, 420);
+        }, delay);
+      });
+    } else if (oldRect) {
+      // 已有卡片：半卡位移到过渡位置，再流动到最终位置
+      const halfCard = (oldRect.height / 2) + 4;
+      const dy = oldRect.top - newRect.top;
+      const dx = oldRect.left - newRect.left;
+
+      if (Math.abs(dy) < 1 && Math.abs(dx) < 1) return;
+
+      // 卡片中间位置（半卡偏移）
+      const midDy = dy > 0 ? dy - halfCard : dy + halfCard;
+
+      // Invert: 移到旧位置
+      row.style.transition = 'none';
+      row.style.transform = `translate(${dx}px, ${dy}px)`;
+      row.style.zIndex = '10';
+
+      const delay = index * 60;
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          // 第一阶段：流动到半卡位置
+          row.style.transition = 'transform 0.25s cubic-bezier(.2,.8,.2,1)';
+          row.style.transform = `translate(${dx * 0.2}px, ${midDy}px)`;
+
+          setTimeout(() => {
+            // 第二阶段：流动到最终位置
+            row.style.transition = 'transform 0.3s cubic-bezier(.2,.8,.2,1)';
+            row.style.transform = '';
+            setTimeout(() => {
+              row.style.transition = '';
+              row.style.zIndex = '';
+            }, 320);
+          }, 260);
+        }, delay);
+      });
+    }
+  });
+
+  // 更新缓存
+  previousActiveIds = new Set(sorted.map(i => i.id));
 }
 
 function openEditor(item) {
@@ -468,7 +587,7 @@ sortBtn.onclick = async () => {
   });
 
   applySettings(next);
-  render();
+  animateSort(); // 使用液态排序动画
 };
 
 widget?.addEventListener('pointermove', updateLiquidSpot);
@@ -495,9 +614,22 @@ widget?.addEventListener('pointermove', updateLiquidSpot);
   list.addEventListener('pointercancel', () => { dragging = false; });
 }
 
+let previousActiveIds = new Set();
+
 window.todoLite.onTodosChanged(data => {
   todos = data;
-  render();
+
+  const newActiveIds = new Set((data.active || []).map(item => item.id));
+  const idsChanged = previousActiveIds.size !== newActiveIds.size ||
+    [...newActiveIds].some(id => !previousActiveIds.has(id));
+
+  const sorted = sortItems(data.active || []);
+  const rows = list.querySelectorAll('.todo');
+  const orderChanged = sorted.some((item, i) => rows[i]?.dataset.id !== item.id);
+
+  if (idsChanged || orderChanged) {
+    animateSort();
+  }
 });
 
 window.todoLite.onSettingsChanged(data => {
@@ -535,6 +667,9 @@ function injectProjectFonts(list) {
 
   todos = await window.todoLite.getTodos();
   settings = await window.todoLite.getSettings();
+
+  // 初始化任务 ID 集合
+  previousActiveIds = new Set((todos.active || []).map(item => item.id));
 
   applySettings(settings);
   bindGlowLifecycle(widget);

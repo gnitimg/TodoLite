@@ -850,6 +850,12 @@ app.whenReady().then(() => {
 
   createWindows();
   createTray();
+
+  let watchBroadcastTimer = null;
+  fs.watch(todosPath, () => {
+    clearTimeout(watchBroadcastTimer);
+    watchBroadcastTimer = setTimeout(() => broadcastTodos(), 200);
+  });
 });
 
 app.on('window-all-closed', () => {
