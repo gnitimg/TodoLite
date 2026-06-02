@@ -59,6 +59,7 @@ let panelBoundsTimer = null;
 let panelZoomed = false;
 let panelRestoreBounds = null;
 let panelAnimating = false;
+let lastAppliedWidgetLayer = null;
 
 function resolvePaths() {
   dataDir = path.join(app.getPath('userData'), 'data');
@@ -314,6 +315,10 @@ function applyWidgetLayer(settings) {
   const layer = settings.widget?.layer || 'desktop';
 
   if (!widgetWindow) return;
+
+  // layer 没变，跳过焦点操纵避免桌面跳转
+  if (lastAppliedWidgetLayer === layer) return;
+  lastAppliedWidgetLayer = layer;
 
   widgetWindow.setSkipTaskbar(true);
 
@@ -652,6 +657,8 @@ ipcMain.handle('settings:get', () => {
   settings.global.startup = getStartupStateFromSystem();
   return settings;
 });
+
+ipcMain.handle('startup:check', () => getStartupStateFromSystem());
 
 ipcMain.handle('fonts:list', () => ({
   project: scanProjectFonts(),

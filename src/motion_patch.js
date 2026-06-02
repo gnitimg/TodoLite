@@ -332,12 +332,14 @@
 
     ddl.addEventListener('click', event => {
       event.preventDefault();
+      event.stopPropagation();
       openDatePicker(ddl);
     }, true);
 
     ddl.addEventListener('keydown', event => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
+        event.stopPropagation();
         openDatePicker(ddl);
       }
     }, true);
