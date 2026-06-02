@@ -660,6 +660,15 @@ ipcMain.handle('settings:get', () => {
 
 ipcMain.handle('startup:check', () => getStartupStateFromSystem());
 
+ipcMain.handle('app:version', () => {
+  try {
+    const pkg = require(path.join(root, 'package.json'));
+    return pkg.version || '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+});
+
 ipcMain.handle('fonts:list', () => ({
   project: scanProjectFonts(),
   system: scanWindowsFonts()

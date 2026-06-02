@@ -79,7 +79,12 @@ const i18n = {
     noMatch: '没有匹配',
     putFonts: '将 .ttf / .otf / .woff 放入 fonts 文件夹',
     edit: '编辑',
-    selectTime: '选择时间'
+    selectTime: '选择时间',
+    about: '关于',
+    version: '版本',
+    license: '开源协议',
+    sourceCode: '源代码',
+    reportIssue: '问题反馈'
   },
   'en-US': {
     tasks: 'Tasks',
@@ -116,6 +121,11 @@ const i18n = {
     putFonts: 'put .ttf / .otf / .woff in fonts',
     edit: 'edit',
     selectTime: 'select time',
+    about: 'About',
+    version: 'Version',
+    license: 'License',
+    sourceCode: 'Source code',
+    reportIssue: 'Report issue'
   }
 };
 
@@ -1022,6 +1032,7 @@ for (const btn of document.querySelectorAll('.nav')) {
 
     document.getElementById('tasksPage').classList.toggle('hidden', btn.dataset.page !== 'tasks');
     document.getElementById('settingsPage').classList.toggle('hidden', btn.dataset.page !== 'settings');
+    document.getElementById('aboutPage').classList.toggle('hidden', btn.dataset.page !== 'about');
   };
 }
 
@@ -1086,6 +1097,10 @@ window.todoLite.onPanelFullscreenChanged(isFull => {
   initAccentPicker();
   initStartupToggle();
   bindGlowLifecycle(panel);
+
+  const ver = await window.todoLite.getVersion();
+  const verEl = document.getElementById('aboutVersion');
+  if (verEl) verEl.textContent = `v${ver}`;
 
   initLiquidSelect({
     rootId: 'languageDropdown',

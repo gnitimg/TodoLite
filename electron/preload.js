@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('todoLite', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   updateSettings: patch => ipcRenderer.invoke('settings:update', patch),
   checkStartup: () => ipcRenderer.invoke('startup:check'),
+  getVersion: () => ipcRenderer.invoke('app:version'),
 
   listFonts: () => ipcRenderer.invoke('fonts:list'),
 

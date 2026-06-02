@@ -366,6 +366,71 @@ form {
   opacity: .74;
 }
 
+.about-card {
+  border-radius: 18px;
+  padding: 18px;
+  background: rgba(255,255,255,.10);
+  border: 1px solid rgba(255,255,255,.16);
+  margin-bottom: 16px;
+}
+
+.about-author {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.about-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255,255,255,.30);
+}
+
+.about-name {
+  font-size: 18px;
+  font-weight: 620;
+  letter-spacing: -.02em;
+}
+
+.about-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.about-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.about-link:hover {
+  text-decoration: underline;
+}
+
+.about-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  font-size: 13px;
+}
+
+.about-row + .about-row {
+  border-top: 1px solid rgba(255,255,255,.12);
+}
+
+.about-row span:first-child {
+  color: var(--muted);
+}
+
+.about-row a.about-link {
+  color: var(--accent);
+}
+
 @media (max-width: 760px) {
   .settings-columns {
     grid-template-columns: 1fr;

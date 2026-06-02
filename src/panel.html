@@ -18,6 +18,7 @@
       <button class="nav active no-drag" data-page="tasks" data-i18n="tasks">任务</button>
       <button class="nav no-drag" data-page="settings" data-i18n="settings">设置</button>
       <div class="spacer"></div>
+      <button class="nav no-drag" data-page="about" data-i18n="about">关于</button>
     </aside>
     <section class="page drag" id="tasksPage">
       <div class="topbar drag"><div><h1 data-i18n="tasks">任务</h1></div><button id="newBtn" class="primary no-drag">+</button></div>
@@ -47,6 +48,31 @@
         </div></div>
       </div>
       <div class="data-actions no-drag"><button id="openData" data-i18n="openData">打开数据</button><button id="openBackups" data-i18n="openBackups">打开备份</button></div>
+    </section>
+    <section class="page drag hidden" id="aboutPage">
+      <div class="topbar drag"><div><h1 data-i18n="about">关于</h1></div></div>
+      <div class="about-card no-drag">
+        <div class="about-author">
+          <img class="about-avatar" src="https://github.com/gnitimg.png" alt="avatar" />
+          <div class="about-name">Gnitimg</div>
+        </div>
+        <div class="about-links">
+          <a href="https://github.com/gnitimg" target="_blank" class="about-link">GitHub</a>
+          <a href="mailto:contact@gnitimg.ac.cn" class="about-link">contact@gnitimg.ac.cn</a>
+        </div>
+      </div>
+      <div class="about-card no-drag">
+        <div class="about-row"><span data-i18n="version">版本</span><span id="aboutVersion"></span></div>
+        <div class="about-row"><span data-i18n="license">开源协议</span><span>MIT License</span></div>
+        <div class="about-row">
+          <span data-i18n="sourceCode">源代码</span>
+          <a href="https://github.com/gnitimg/TodoLite" target="_blank" class="about-link">github.com/gnitimg/TodoLite</a>
+        </div>
+        <div class="about-row">
+          <span data-i18n="reportIssue">问题反馈</span>
+          <a href="https://github.com/gnitimg/TodoLite/issues" target="_blank" class="about-link">GitHub Issues</a>
+        </div>
+      </div>
     </section>
   </main>
 
