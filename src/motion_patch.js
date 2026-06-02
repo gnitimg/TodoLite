@@ -454,8 +454,6 @@
     const surface = document.querySelector('.widget.glass, .panel.glass, .glass');
     installGlow(surface);
 
-    installContextMenu();
-    installDatePicker();
     patchCompletionAnimation();
 
     window.todoLite?.onTodosChanged?.(data => {

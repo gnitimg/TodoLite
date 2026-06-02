@@ -797,12 +797,26 @@ ipcMain.handle('todos:remove', (_, id) => {
 });
 
 ipcMain.handle('settings:update', (_, patch) => {
-  const current = readJson(settingsPath, defaultSettings);
+  const current = mergeSettings(readJson(settingsPath, defaultSettings));
   const settings = mergeSettings(current, patch || {});
 
   atomicWriteJson(settingsPath, settings, false);
-  applyStartup(settings.global?.startup);
-  applyWidgetLayer(settings);
+
+  const startupChanged = Object.prototype.hasOwnProperty.call(patch?.global || {}, 'startup');
+  const widgetLayerChanged =
+    Object.prototype.hasOwnProperty.call(patch?.widget || {}, 'layer') &&
+    current.widget?.layer !== settings.widget?.layer;
+
+  if (startupChanged) {
+    applyStartup(settings.global?.startup);
+    settings.global.startup = getStartupStateFromSystem();
+    atomicWriteJson(settingsPath, settings, false);
+  }
+
+  if (widgetLayerChanged) {
+    applyWidgetLayer(settings);
+  }
+
   broadcastSettings();
 
   return settings;
