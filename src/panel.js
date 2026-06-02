@@ -145,59 +145,6 @@ function t(key) {
   return i18n[lang]?.[key] || i18n['zh-CN'][key] || key;
 }
 
-function toLocalInput(value) {
-  return String(value || '').replace(' ', 'T');
-}
-
-function fromLocalInput(value) {
-  const v = String(value || '').trim().replace('T', ' ');
-
-  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(v)) {
-    return `${v}:00`;
-  }
-
-  return v;
-}
-
-function pad(n) {
-  return String(n).padStart(2, '0');
-}
-
-function defaultDdl() {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() + 1);
-  d.setSeconds(0);
-  d.setMilliseconds(0);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
-}
-
-function clamp01(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.min(1, n));
-}
-
-function clamp100(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.min(100, n));
-}
-
-function hexToRgb(hex) {
-  const clean = String(hex || '#5f8cff').replace('#', '');
-  const full = clean.length === 3
-    ? clean.split('').map(x => x + x).join('')
-    : clean.padEnd(6, '0').slice(0, 6);
-
-  const n = parseInt(full, 16);
-
-  return {
-    r: (n >> 16) & 255,
-    g: (n >> 8) & 255,
-    b: n & 255
-  };
-}
-
 function normalizeHex(value) {
   const raw = String(value || '').trim();
 
@@ -216,28 +163,40 @@ function hslToHex(h, s = 88, l = 62) {
   s /= 100;
   l /= 100;
 
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const hp = h / 60;
-  const x = c * (1 - Math.abs((hp % 2) - 1));
+  const a = s * Math.min(l, 1 - l);
 
-  let r = 0;
-  let g = 0;
-  let b = 0;
+  function f(n) {
+    const k = (n + h / 30) % 12;
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color).toString(16).padStart(2, '0');
+  }
 
-  if (hp >= 0 && hp < 1) [r, g, b] = [c, x, 0];
-  else if (hp >= 1 && hp < 2) [r, g, b] = [x, c, 0];
-  else if (hp >= 2 && hp < 3) [r, g, b] = [0, c, x];
-  else if (hp >= 3 && hp < 4) [r, g, b] = [0, x, c];
-  else if (hp >= 4 && hp < 5) [r, g, b] = [x, 0, c];
-  else [r, g, b] = [c, 0, x];
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
 
-  const m = l - c / 2;
+function hexToHsl(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  const r1 = r / 255;
+  const g1 = g / 255;
+  const b1 = b / 255;
+  const max = Math.max(r1, g1, b1);
+  const min = Math.min(r1, g1, b1);
+  const d = max - min;
+  let h = 0;
 
-  const toHex = n => Math.round((n + m) * 255)
-    .toString(16)
-    .padStart(2, '0');
+  if (d !== 0) {
+    if (max === r1) h = ((g1 - b1) / d) % 6;
+    else if (max === g1) h = (b1 - r1) / d + 2;
+    else h = (r1 - g1) / d + 4;
 
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+
+  const l = (max + min) / 2;
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+
+  return { h: Math.round(h), s: Math.round(s * 100), l: Math.round(l * 100) };
 }
 
 function hexToHue(hex) {
@@ -310,56 +269,11 @@ function pickAccentFromPoint(clientX, clientY) {
   syncAccentDialog(hslToHex(hue));
 }
 
-function setSurfaceVars(target, surface, global) {
-  const opacity = clamp01(surface.glassOpacity ?? .2);
-  const blur = clamp100(surface.blurStrength ?? 18);
-  const radius = Number(surface.cornerRadius ?? 22);
-  const accent = global.accentColor || '#5f8cff';
-  const rgb = hexToRgb(accent);
-
-  const mistOpacity = Math.min(0.62, blur / 130);
-  const hazeOpacity = Math.min(0.52, blur / 155);
-  const glowSize = 120 + blur * 2.4;
-
-  const vars = {
-    '--opacity': String(opacity),
-    '--blur': `${blur}px`,
-    '--radius': `${radius}px`,
-    '--mist-opacity': String(mistOpacity),
-    '--haze-opacity': String(hazeOpacity),
-    '--glow-size': `${glowSize}px`,
-    '--accent': accent,
-    '--accent-rgb': `${rgb.r}, ${rgb.g}, ${rgb.b}`,
-    '--glass': `rgba(255,255,255,${opacity})`
-  };
-
-  for (const [key, value] of Object.entries(vars)) {
-    document.documentElement.style.setProperty(key, value);
-    target?.style.setProperty(key, value);
-  }
-}
-
-function applyGlobalSettings(global) {
-  const g = global || {};
-  const safeName = safeFontName(g.fontFamily || 'system');
-
-  const family = g.fontFamily && g.fontFamily !== 'system'
-    ? `'${safeName}', 'Segoe UI', system-ui, sans-serif`
-    : `Inter, 'Segoe UI', system-ui, sans-serif`;
-
-  document.documentElement.lang = g.language || 'zh-CN';
-  document.documentElement.style.setProperty('--font-family', family);
-  document.documentElement.style.setProperty('--font-size', `${g.fontSize || 14}px`);
-
-  document.body.style.fontFamily = family;
-  document.body.style.fontSize = `${g.fontSize || 14}px`;
-}
-
 function applySettings(s) {
   settings = s || {};
 
   applyGlobalSettings(settings.global || {});
-  setSurfaceVars(panel, settings.panel || {}, settings.global || {});
+  setSurfaceVars(panel, settings.panel || {}, settings.global || {}, { glassOpacity: .20, blurStrength: 18, cornerRadius: 22 });
   syncSettingsUI();
   applyTranslations();
 }
@@ -438,27 +352,6 @@ function updateStartupSelected() {
   startupToggle.classList.toggle('active', enabled);
   startupToggle.setAttribute('aria-pressed', String(enabled));
   startupText.textContent = enabled ? t('on') : t('off');
-}
-
-function safeFontName(name) {
-  return String(name || '').replace(/['\\]/g, '');
-}
-
-function injectProjectFonts(list) {
-  if (!list.length) return;
-
-  const old = document.getElementById('projectFontsStyle');
-  if (old) old.remove();
-
-  const style = document.createElement('style');
-  style.id = 'projectFontsStyle';
-
-  style.textContent = list.map(f => {
-    const name = safeFontName(f.name);
-    return `@font-face{font-family:'${name}';src:url('${f.url}');font-display:swap;}`;
-  }).join('\n');
-
-  document.head.appendChild(style);
 }
 
 function closeAllLiquidSelects(except) {
@@ -863,28 +756,6 @@ function updateLiquidSpot(event) {
 
   panel.style.setProperty('--spot-x', `${x}%`);
   panel.style.setProperty('--spot-y', `${y}%`);
-}
-
-function bindGlowLifecycle(surface) {
-  if (!surface) return;
-
-  surface.classList.add('is-idle');
-  surface.classList.remove('is-lit');
-
-  const lightOn = () => {
-    surface.classList.remove('is-idle');
-    surface.classList.add('is-lit');
-  };
-
-  const lightOff = () => {
-    surface.classList.remove('is-lit');
-    surface.classList.add('is-idle');
-  };
-
-  surface.addEventListener('mouseenter', lightOn);
-  surface.addEventListener('pointerenter', lightOn);
-  surface.addEventListener('mouseleave', lightOff);
-  surface.addEventListener('pointerleave', lightOff);
 }
 
 function initAccentPicker() {

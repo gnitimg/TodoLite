@@ -397,8 +397,8 @@ form {
 
 .about-links {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 8px 16px;
 }
 
 .about-link {

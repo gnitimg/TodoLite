@@ -39,18 +39,6 @@
     return i18n[lang()]?.[key] || i18n['zh-CN'][key] || key;
   }
 
-  function pad(n) {
-    return String(n).padStart(2, '0');
-  }
-
-  function defaultDdl() {
-    const d = new Date();
-    d.setMinutes(d.getMinutes() + 1);
-    d.setSeconds(0);
-    d.setMilliseconds(0);
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
-  }
-
   function itemKeyFromEl(el) {
     if (!el) return '';
     const title = el.querySelector('.content-title, .title')?.textContent?.trim() || '';
