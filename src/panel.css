@@ -155,6 +155,12 @@
   min-width: 0;
   padding: 24px;
   overflow: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.page::-webkit-scrollbar {
+  display: none;
 }
 
 .hidden {

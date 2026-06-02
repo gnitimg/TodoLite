@@ -473,6 +473,28 @@ sortBtn.onclick = async () => {
 
 widget?.addEventListener('pointermove', updateLiquidSpot);
 
+{
+  let dragging = false;
+  let startY = 0;
+  let startScroll = 0;
+
+  list.addEventListener('pointerdown', event => {
+    if (event.button !== 0) return;
+    dragging = true;
+    startY = event.clientY;
+    startScroll = list.scrollTop;
+    list.setPointerCapture(event.pointerId);
+  });
+
+  list.addEventListener('pointermove', event => {
+    if (!dragging) return;
+    list.scrollTop = Math.max(0, startScroll - (event.clientY - startY));
+  });
+
+  list.addEventListener('pointerup', () => { dragging = false; });
+  list.addEventListener('pointercancel', () => { dragging = false; });
+}
+
 window.todoLite.onTodosChanged(data => {
   todos = data;
   render();
