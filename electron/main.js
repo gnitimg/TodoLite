@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { autoUpdater } = require('electron-updater');
 const root = path.join(__dirname, '..');
 const iconPath = app.isPackaged
   ? path.join(process.resourcesPath, 'build', 'icon.ico')
@@ -351,6 +352,29 @@ function applyWidgetLayer(settings) {
     widgetWindow.blur();
     enforceWidgetTrayOnly();
   }, 260);
+}
+
+function setupAutoUpdater() {
+  if (!app.isPackaged) return;
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('update-available', () => {
+    panelWindow?.webContents.send('update:available');
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    panelWindow?.webContents.send('update:downloaded');
+  });
+
+  autoUpdater.on('error', error => {
+    panelWindow?.webContents.send('update:error', String(error?.message || error));
+  });
+
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch(() => {});
+  }, 3000);
 }
 
 function saveBounds(kind) {
@@ -855,6 +879,10 @@ ipcMain.handle('app:quit', () => {
   app.quit();
 });
 
+ipcMain.handle('update:install', () => {
+  autoUpdater.quitAndInstall();
+});
+
 app.whenReady().then(() => {
   resolvePaths();
   ensureDataFiles();
@@ -864,6 +892,7 @@ app.whenReady().then(() => {
 
   createWindows();
   createTray();
+  setupAutoUpdater();
 
   let watchBroadcastTimer = null;
   fs.watch(todosPath, () => {

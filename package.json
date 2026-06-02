@@ -29,6 +29,13 @@
     "directories": {
       "output": "release"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "gnitimg",
+        "repo": "TodoLite"
+      }
+    ],
     "files": [
       "electron/**/*",
       "src/**/*",
@@ -78,5 +85,8 @@
       "createStartMenuShortcut": true,
       "shortcutName": "TodoLite"
     }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.3"
   }
 }

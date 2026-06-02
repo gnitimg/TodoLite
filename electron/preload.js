@@ -30,8 +30,12 @@ contextBridge.exposeInMainWorld('todoLite', {
   getPanelFullscreenState: () => ipcRenderer.invoke('app:panel-fullscreen-state'),
 
   quit: () => ipcRenderer.invoke('app:quit'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
 
   onTodosChanged: cb => subscribe('todos:changed', cb),
   onSettingsChanged: cb => subscribe('settings:changed', cb),
-  onPanelFullscreenChanged: cb => subscribe('panel:maximize-changed', cb)
+  onPanelFullscreenChanged: cb => subscribe('panel:maximize-changed', cb),
+  onUpdateAvailable: cb => ipcRenderer.on('update:available', () => cb()),
+  onUpdateDownloaded: cb => ipcRenderer.on('update:downloaded', () => cb()),
+  onUpdateError: cb => ipcRenderer.on('update:error', (_, message) => cb(message))
 });
