@@ -192,7 +192,7 @@
     captureLayout();
 
     const rect = el.getBoundingClientRect();
-    const count = 30;
+    const count = 300;
 
     el.style.maxHeight = `${rect.height}px`;
     el.classList.add('particle-removing');

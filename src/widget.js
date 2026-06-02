@@ -229,7 +229,7 @@ function removeWithParticles(row, id) {
   if (!row || row.classList.contains('particle-removing')) return;
 
   const rect = row.getBoundingClientRect();
-  const count = 18;
+  const count = 300;
 
   row.classList.add('particle-removing');
 
@@ -634,7 +634,7 @@ window.todoLite.onTodosChanged(data => {
 
 window.todoLite.onSettingsChanged(data => {
   applySettings(data);
-  render();
+  animateSort();
 });
 
 function safeFontName(name) {
