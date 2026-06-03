@@ -264,6 +264,12 @@ textarea {
   max-height: 204px;
   overflow-y: auto;
   padding-right: 2px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.liquid-options::-webkit-scrollbar {
+  display: none;
 }
 
 .liquid-option {

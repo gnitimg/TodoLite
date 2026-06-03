@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { autoUpdater } = require('electron-updater');
 const root = path.join(__dirname, '..');
 const iconPath = app.isPackaged
   ? path.join(process.resourcesPath, 'build', 'icon.ico')
@@ -59,6 +60,7 @@ let panelBoundsTimer = null;
 let panelZoomed = false;
 let panelRestoreBounds = null;
 let panelAnimating = false;
+let lastAppliedWidgetLayer = null;
 
 function resolvePaths() {
   dataDir = path.join(app.getPath('userData'), 'data');
@@ -315,6 +317,10 @@ function applyWidgetLayer(settings) {
 
   if (!widgetWindow) return;
 
+  // layer 没变，跳过焦点操纵避免桌面跳转
+  if (lastAppliedWidgetLayer === layer) return;
+  lastAppliedWidgetLayer = layer;
+
   widgetWindow.setSkipTaskbar(true);
 
   if (layer === 'topmost') {
@@ -346,6 +352,29 @@ function applyWidgetLayer(settings) {
     widgetWindow.blur();
     enforceWidgetTrayOnly();
   }, 260);
+}
+
+function setupAutoUpdater() {
+  if (!app.isPackaged) return;
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('update-available', () => {
+    panelWindow?.webContents.send('update:available');
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    panelWindow?.webContents.send('update:downloaded');
+  });
+
+  autoUpdater.on('error', error => {
+    panelWindow?.webContents.send('update:error', String(error?.message || error));
+  });
+
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch(() => {});
+  }, 3000);
 }
 
 function saveBounds(kind) {
@@ -653,6 +682,17 @@ ipcMain.handle('settings:get', () => {
   return settings;
 });
 
+ipcMain.handle('startup:check', () => getStartupStateFromSystem());
+
+ipcMain.handle('app:version', () => {
+  try {
+    const pkg = require(path.join(root, 'package.json'));
+    return pkg.version || '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+});
+
 ipcMain.handle('fonts:list', () => ({
   project: scanProjectFonts(),
   system: scanWindowsFonts()
@@ -781,12 +821,26 @@ ipcMain.handle('todos:remove', (_, id) => {
 });
 
 ipcMain.handle('settings:update', (_, patch) => {
-  const current = readJson(settingsPath, defaultSettings);
+  const current = mergeSettings(readJson(settingsPath, defaultSettings));
   const settings = mergeSettings(current, patch || {});
 
   atomicWriteJson(settingsPath, settings, false);
-  applyStartup(settings.global?.startup);
-  applyWidgetLayer(settings);
+
+  const startupChanged = Object.prototype.hasOwnProperty.call(patch?.global || {}, 'startup');
+  const widgetLayerChanged =
+    Object.prototype.hasOwnProperty.call(patch?.widget || {}, 'layer') &&
+    current.widget?.layer !== settings.widget?.layer;
+
+  if (startupChanged) {
+    applyStartup(settings.global?.startup);
+    settings.global.startup = getStartupStateFromSystem();
+    atomicWriteJson(settingsPath, settings, false);
+  }
+
+  if (widgetLayerChanged) {
+    applyWidgetLayer(settings);
+  }
+
   broadcastSettings();
 
   return settings;
@@ -825,6 +879,10 @@ ipcMain.handle('app:quit', () => {
   app.quit();
 });
 
+ipcMain.handle('update:install', () => {
+  autoUpdater.quitAndInstall();
+});
+
 app.whenReady().then(() => {
   resolvePaths();
   ensureDataFiles();
@@ -834,6 +892,13 @@ app.whenReady().then(() => {
 
   createWindows();
   createTray();
+  setupAutoUpdater();
+
+  let watchBroadcastTimer = null;
+  fs.watch(todosPath, () => {
+    clearTimeout(watchBroadcastTimer);
+    watchBroadcastTimer = setTimeout(() => broadcastTodos(), 200);
+  });
 });
 
 app.on('window-all-closed', () => {

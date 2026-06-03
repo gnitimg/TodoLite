@@ -39,18 +39,6 @@
     return i18n[lang()]?.[key] || i18n['zh-CN'][key] || key;
   }
 
-  function pad(n) {
-    return String(n).padStart(2, '0');
-  }
-
-  function defaultDdl() {
-    const d = new Date();
-    d.setMinutes(d.getMinutes() + 1);
-    d.setSeconds(0);
-    d.setMilliseconds(0);
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
-  }
-
   function itemKeyFromEl(el) {
     if (!el) return '';
     const title = el.querySelector('.content-title, .title')?.textContent?.trim() || '';
@@ -192,7 +180,7 @@
     captureLayout();
 
     const rect = el.getBoundingClientRect();
-    const count = 30;
+    const count = 300;
 
     el.style.maxHeight = `${rect.height}px`;
     el.classList.add('particle-removing');
@@ -332,12 +320,14 @@
 
     ddl.addEventListener('click', event => {
       event.preventDefault();
+      event.stopPropagation();
       openDatePicker(ddl);
     }, true);
 
     ddl.addEventListener('keydown', event => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
+        event.stopPropagation();
         openDatePicker(ddl);
       }
     }, true);
@@ -464,8 +454,6 @@
     const surface = document.querySelector('.widget.glass, .panel.glass, .glass');
     installGlow(surface);
 
-    installContextMenu();
-    installDatePicker();
     patchCompletionAnimation();
 
     window.todoLite?.onTodosChanged?.(data => {
