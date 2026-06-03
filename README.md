@@ -1,11 +1,19 @@
 # TodoLite
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Author](https://img.shields.io/badge/Author-Gnitimg-orange.svg)](https://github.com/gnitimg)
+[![Release](https://img.shields.io/badge/Release-v0.1.2-green.svg)](https://github.com/gnitimg/TodoLite/releases/tag/v0.1.2)
+
 A minimal Windows desktop todo layer with iOS 26 liquid-glass aesthetics.
 
 Two surfaces, one purpose: **get things done without thinking about the tool.**
 
 - **Widget** — stays on your desktop. Checkbox, content, DDL. Expand for detail. That's it.
 - **Panel** — hides in the system tray. Full task management, completed records by date, settings.
+
+## Download
+
+[**Download TodoLite v0.1.2 Installer**](https://github.com/gnitimg/TodoLite/releases/download/v0.1.2/TodoLite-0.1.2-x64.exe)
 
 ## Philosophy
 
@@ -43,19 +51,21 @@ Storage structure (`data/todos.json`):
 ```
 TodoLite/
 ├── electron/
-│   ├── main.js          # App lifecycle, windows, tray, IPC handlers
+│   ├── main.js          # App lifecycle, windows, tray, IPC, font scanning
 │   └── preload.js       # Secure context bridge (contextIsolation)
 ├── src/
 │   ├── widget.html      # Desktop widget markup
-│   ├── widget.js        # Widget logic (render, complete, sort)
+│   ├── widget.js        # Widget logic (render, complete, sort, i18n)
 │   ├── widget.css       # Widget styles + completion animation
 │   ├── panel.html       # Full panel markup (Tasks + Settings pages)
-│   ├── panel.js         # Panel logic (CRUD, settings, font injection)
-│   ├── panel.css        # Panel styles
-│   └── shared.css       # Glass effect, typography, shared tokens
+│   ├── panel.js         # Panel logic (CRUD, settings, accent wheel, i18n)
+│   ├── panel.css        # Panel styles + traffic lights
+│   ├── shared.css       # Glass base, liquid-select, liquid-toggle, typography
+│   ├── motion_patch.css # Glow lifecycle, FLIP layout, particles, context menu
+│   └── motion_patch.js  # Self-contained motion/interaction module
 ├── data/
 │   ├── todos.json       # Active / completed / removed tasks
-│   ├── settings.json    # User preferences
+│   ├── settings.json    # User preferences (persisted in userData)
 │   └── backups/         # Auto-backup (max 30, timestamped)
 ├── fonts/               # Drop .ttf/.otf/.woff/.woff2 here
 ├── package.json
@@ -65,31 +75,54 @@ TodoLite/
 ## Features
 
 ### Widget (Desktop Layer)
-- Checkbox to complete — dark-gray line sweep left-to-right, then collapse
-- Embedded wallpaper effect: ultra-low glass opacity, no visible border
+- Checkbox to complete — dark-gray line sweep left-to-right, then collapse with particle effect
+- Embedded wallpaper effect: ultra-low glass opacity, mouse-tracking glow
+- Right-click context menu (edit / delete with particle animation)
+- Custom DDL picker (Y/M/D/H/M/S grid, no native datetime-local)
 - Click to expand detail; double-click to edit
-- Sort by DDL toggle
+- Sort by DDL toggle (persisted)
 - Add new task inline
+- i18n (zh-CN / en-US)
 
 ### Panel (Tray-Open Full Page)
 - **Tasks page** — active list + completed-by-date archive
-- **Settings page** — independent glass config for widget and panel
-- macOS-style traffic light buttons (close / minimize / fullscreen)
+- **Settings page** — three-column layout (Global / Widget / Panel)
+- macOS-style traffic light buttons (close / minimize / zoom)
+- Animated panel zoom (easeOutCubic, replaces native maximize)
 - Sidebar navigation
-- Lighter glass effect (less blur, more transparent) for the full page
+- Lighter glass effect for the full page
+
+### Settings
+
+| Section | Controls |
+|---------|----------|
+| **Global** | Font (system + project), font size, language, accent color (conic wheel), startup toggle |
+| **Widget** | Glass opacity, blur, corner radius |
+| **Panel** | Glass opacity, blur, corner radius, layer (desktop / normal / topmost) |
+
+### Glass & Motion
+- iOS 26 liquid-glass aesthetic (backdrop-filter, radial glow, grain texture)
+- Mouse-tracking glow with edge sensors (enter/leave detection)
+- Glow tri-state: lit (hover highlight) / idle (fade diffusion) / default
+- FLIP layout animation on task reorder
+- Particle deletion effect (accent-colored dots disperse)
+- Liquid-select, liquid-toggle glass-styled components
 
 ### Fonts
-- System font scanning from `C:\Windows\Fonts`
+- Windows system font scanning from `C:\Windows\Fonts`
 - Project fonts from `fonts/` directory
-- Searchable glass-styled font dropdown in settings
-- Live font preview in dropdown
+- Searchable glass-styled font dropdown
+- Live font preview
+- Safe font name sanitization
 
 ### Data Safety
 - Atomic writes (write to `.tmp`, then rename)
 - Auto-backup before every task mutation (keeps last 30)
+- Data stored in `app.getPath('userData')` (survives app updates)
+- Legacy data migration from project directory
 - Open data / backup folders from settings
 
-## Run
+## Run (Development)
 
 ```bash
 npm install
@@ -100,19 +133,7 @@ Requires Node.js. Uses Electron — no native dependencies, no SQLite binary bui
 
 ## Custom Fonts
 
-Drop `.ttf`, `.otf`, `.woff`, or `.woff2` files into `fonts/`. They appear in the font dropdown under "project" alongside system fonts.
-
-## Settings
-
-Widget and panel have independent glass settings:
-
-| Setting | Widget default | Panel default |
-|---------|---------------|---------------|
-| Glass opacity | 0.14 | 0.20 |
-| Blur | 36px | 18px |
-| Corner radius | 24px | 22px |
-
-Widget is designed to blend into the desktop wallpaper. Panel is designed to be a clean, lighter overlay.
+Drop `.ttf`, `.otf`, `.woff`, or `.woff2` files into `fonts/`. They appear in the font dropdown under "project fonts" alongside Windows system fonts.
 
 ## What's Done
 
@@ -121,17 +142,24 @@ Widget is designed to blend into the desktop wallpaper. Panel is designed to be 
 - [x] Minimal data model (content, ddl, detail only)
 - [x] Completion by location (active → completed[date])
 - [x] Desktop widget with checkbox, content, DDL, expandable detail
-- [x] Completion animation: dark-gray line sweep + collapse
-- [x] Widget embedded wallpaper effect (ultra-low opacity glass)
+- [x] Completion animation: dark-gray line sweep + collapse + particles
+- [x] Widget embedded wallpaper effect with mouse-tracking glow
+- [x] Right-click context menu with particle deletion
+- [x] Custom DDL picker (Y/M/D/H/M/S)
 - [x] Panel: Tasks page with active + completed-by-date sections
-- [x] Panel: independent widget/panel glass settings
-- [x] Panel: macOS traffic light buttons (close / minimize / fullscreen)
-- [x] System font scanning + searchable glass-styled font dropdown
+- [x] Panel: three-column settings (Global / Widget / Panel)
+- [x] Panel: macOS traffic light buttons with animated zoom
+- [x] Accent color: conic-gradient wheel + presets
+- [x] i18n: zh-CN / en-US with runtime switching
+- [x] Startup toggle (launch at login)
+- [x] Windows system font scanning + searchable dropdown
 - [x] Custom font injection from `fonts/` directory
 - [x] System tray with click-to-toggle panel
-- [x] iOS 26 liquid-glass aesthetic (backdrop-filter, radial highlights, grain texture)
-- [x] Configurable window level (desktop / normal / topmost)
-- [x] Sort by DDL on widget
+- [x] iOS 26 liquid-glass aesthetic with glow lifecycle
+- [x] FLIP layout animation on task reorder
+- [x] Configurable widget layer (desktop / normal / topmost)
+- [x] Sort by DDL (persisted)
+- [x] Window bounds persistence (position + size)
 
 ## License
 

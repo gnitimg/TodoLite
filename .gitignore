@@ -1,3 +1,9 @@
 node_modules/
 dist/
 data/backups/
+release/
+dist/
+release2/
+release3/
+release4/
+release5/

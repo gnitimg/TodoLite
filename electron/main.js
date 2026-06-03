@@ -1,10 +1,19 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
-
+const { autoUpdater } = require('electron-updater');
 const root = path.join(__dirname, '..');
+const iconPath = app.isPackaged
+  ? path.join(process.resourcesPath, 'build', 'icon.ico')
+  : path.join(root, 'build', 'icon.ico');
 const legacyDataDir = path.join(root, 'data');
-const fontsDir = path.join(root, 'fonts');
+const bundledFontsDir = app.isPackaged
+  ? path.join(process.resourcesPath, 'fonts')
+  : path.join(root, 'fonts');
+const trayIconPath = app.isPackaged
+  ? path.join(process.resourcesPath, 'build', 'icon.png')
+  : path.join(root, 'build', 'icon.png');
+const userFontsDir = path.join(app.getPath('userData'), 'fonts');
 
 let dataDir;
 let todosPath;
@@ -51,6 +60,7 @@ let panelBoundsTimer = null;
 let panelZoomed = false;
 let panelRestoreBounds = null;
 let panelAnimating = false;
+let lastAppliedWidgetLayer = null;
 
 function resolvePaths() {
   dataDir = path.join(app.getPath('userData'), 'data');
@@ -173,7 +183,7 @@ function mergeSettings(current = {}, patch = {}) {
 
 function ensureDataFiles() {
   fs.mkdirSync(dataDir, { recursive: true });
-  fs.mkdirSync(fontsDir, { recursive: true });
+  fs.mkdirSync(userFontsDir, { recursive: true });
   fs.mkdirSync(backupDir, { recursive: true });
 
   const legacyTodosPath = path.join(legacyDataDir, 'todos.json');
@@ -307,6 +317,10 @@ function applyWidgetLayer(settings) {
 
   if (!widgetWindow) return;
 
+  // layer 没变，跳过焦点操纵避免桌面跳转
+  if (lastAppliedWidgetLayer === layer) return;
+  lastAppliedWidgetLayer = layer;
+
   widgetWindow.setSkipTaskbar(true);
 
   if (layer === 'topmost') {
@@ -338,6 +352,29 @@ function applyWidgetLayer(settings) {
     widgetWindow.blur();
     enforceWidgetTrayOnly();
   }, 260);
+}
+
+function setupAutoUpdater() {
+  if (!app.isPackaged) return;
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('update-available', () => {
+    panelWindow?.webContents.send('update:available');
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    panelWindow?.webContents.send('update:downloaded');
+  });
+
+  autoUpdater.on('error', error => {
+    panelWindow?.webContents.send('update:error', String(error?.message || error));
+  });
+
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch(() => {});
+  }, 3000);
 }
 
 function saveBounds(kind) {
@@ -453,6 +490,7 @@ function createWindows() {
   const pb = ps.bounds || defaultSettings.panel.bounds;
 
   widgetWindow = new BrowserWindow({
+    icon: iconPath,
     width: wb.width || 430,
     height: wb.height || 340,
     x: Number.isFinite(wb.x) ? wb.x : 36,
@@ -509,6 +547,7 @@ function createWindows() {
   });
 
   panelWindow = new BrowserWindow({
+    icon: iconPath,
     width: pb.width || 780,
     height: pb.height || 640,
     minWidth: 620,
@@ -541,14 +580,7 @@ function createWindows() {
 }
 
 function createTray() {
-  const svg = encodeURIComponent(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">
-      <rect x="9" y="9" width="46" height="46" rx="14" fill="rgba(255,255,255,.88)"/>
-      <path d="M22 33l7 7 15-18" fill="none" stroke="rgba(20,20,24,.86)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-  `);
-
-  const icon = nativeImage.createFromDataURL(`data:image/svg+xml;charset=utf-8,${svg}`);
+  const icon = nativeImage.createFromPath(trayIconPath).resize({ width: 16, height: 16 });
 
   tray = new Tray(icon);
   tray.setToolTip('TodoLite');
@@ -610,8 +642,27 @@ function scanFontDir(dir, system = false) {
   }
 }
 
+function mergeFonts(...groups) {
+  const map = new Map();
+
+  for (const group of groups) {
+    for (const font of group) {
+      const key = `${font.name}-${font.file}-${font.system ? 'system' : 'local'}`;
+
+      if (!map.has(key)) {
+        map.set(key, font);
+      }
+    }
+  }
+
+  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
 function scanProjectFonts() {
-  return scanFontDir(fontsDir, false);
+  return mergeFonts(
+    scanFontDir(bundledFontsDir, false),
+    scanFontDir(userFontsDir, false)
+  );
 }
 
 function scanWindowsFonts() {
@@ -629,6 +680,17 @@ ipcMain.handle('settings:get', () => {
   const settings = mergeSettings(readJson(settingsPath, defaultSettings));
   settings.global.startup = getStartupStateFromSystem();
   return settings;
+});
+
+ipcMain.handle('startup:check', () => getStartupStateFromSystem());
+
+ipcMain.handle('app:version', () => {
+  try {
+    const pkg = require(path.join(root, 'package.json'));
+    return pkg.version || '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
 });
 
 ipcMain.handle('fonts:list', () => ({
@@ -759,12 +821,26 @@ ipcMain.handle('todos:remove', (_, id) => {
 });
 
 ipcMain.handle('settings:update', (_, patch) => {
-  const current = readJson(settingsPath, defaultSettings);
+  const current = mergeSettings(readJson(settingsPath, defaultSettings));
   const settings = mergeSettings(current, patch || {});
 
   atomicWriteJson(settingsPath, settings, false);
-  applyStartup(settings.global?.startup);
-  applyWidgetLayer(settings);
+
+  const startupChanged = Object.prototype.hasOwnProperty.call(patch?.global || {}, 'startup');
+  const widgetLayerChanged =
+    Object.prototype.hasOwnProperty.call(patch?.widget || {}, 'layer') &&
+    current.widget?.layer !== settings.widget?.layer;
+
+  if (startupChanged) {
+    applyStartup(settings.global?.startup);
+    settings.global.startup = getStartupStateFromSystem();
+    atomicWriteJson(settingsPath, settings, false);
+  }
+
+  if (widgetLayerChanged) {
+    applyWidgetLayer(settings);
+  }
+
   broadcastSettings();
 
   return settings;
@@ -803,6 +879,10 @@ ipcMain.handle('app:quit', () => {
   app.quit();
 });
 
+ipcMain.handle('update:install', () => {
+  autoUpdater.quitAndInstall();
+});
+
 app.whenReady().then(() => {
   resolvePaths();
   ensureDataFiles();
@@ -812,6 +892,13 @@ app.whenReady().then(() => {
 
   createWindows();
   createTray();
+  setupAutoUpdater();
+
+  let watchBroadcastTimer = null;
+  fs.watch(todosPath, () => {
+    clearTimeout(watchBroadcastTimer);
+    watchBroadcastTimer = setTimeout(() => broadcastTodos(), 200);
+  });
 });
 
 app.on('window-all-closed', () => {

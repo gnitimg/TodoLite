@@ -48,104 +48,6 @@ function t(key) {
   return i18n[lang]?.[key] || i18n['zh-CN'][key] || key;
 }
 
-function pad(n) {
-  return String(n).padStart(2, '0');
-}
-
-function defaultDdl() {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() + 1);
-  d.setSeconds(0);
-  d.setMilliseconds(0);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
-}
-
-function toLocalInput(value) {
-  return String(value || '').replace(' ', 'T');
-}
-
-function fromLocalInput(value) {
-  const v = String(value || '').trim().replace('T', ' ');
-
-  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(v)) {
-    return `${v}:00`;
-  }
-
-  return v;
-}
-
-function clamp01(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.min(1, n));
-}
-
-function clamp100(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.min(100, n));
-}
-
-function hexToRgb(hex) {
-  const clean = String(hex || '#5f8cff').replace('#', '');
-  const full = clean.length === 3
-    ? clean.split('').map(x => x + x).join('')
-    : clean.padEnd(6, '0').slice(0, 6);
-
-  const n = parseInt(full, 16);
-
-  return {
-    r: (n >> 16) & 255,
-    g: (n >> 8) & 255,
-    b: n & 255
-  };
-}
-
-function setSurfaceVars(target, surface, global) {
-  const opacity = clamp01(surface.glassOpacity ?? .14);
-  const blur = clamp100(surface.blurStrength ?? 36);
-  const radius = Number(surface.cornerRadius ?? 24);
-  const accent = global.accentColor || '#5f8cff';
-  const rgb = hexToRgb(accent);
-
-  const mistOpacity = Math.min(0.62, blur / 130);
-  const hazeOpacity = Math.min(0.52, blur / 155);
-  const glowSize = 120 + blur * 2.4;
-
-  const vars = {
-    '--opacity': String(opacity),
-    '--blur': `${blur}px`,
-    '--radius': `${radius}px`,
-    '--mist-opacity': String(mistOpacity),
-    '--haze-opacity': String(hazeOpacity),
-    '--glow-size': `${glowSize}px`,
-    '--accent': accent,
-    '--accent-rgb': `${rgb.r}, ${rgb.g}, ${rgb.b}`,
-    '--glass': `rgba(255,255,255,${opacity})`
-  };
-
-  for (const [key, value] of Object.entries(vars)) {
-    document.documentElement.style.setProperty(key, value);
-    target?.style.setProperty(key, value);
-  }
-}
-
-function applyGlobalSettings(global) {
-  const g = global || {};
-  const safeName = safeFontName(g.fontFamily || 'system');
-
-  const family = g.fontFamily && g.fontFamily !== 'system'
-    ? `'${safeName}', 'Segoe UI', system-ui, sans-serif`
-    : `Inter, 'Segoe UI', system-ui, sans-serif`;
-
-  document.documentElement.lang = g.language || 'zh-CN';
-  document.documentElement.style.setProperty('--font-family', family);
-  document.documentElement.style.setProperty('--font-size', `${g.fontSize || 14}px`);
-
-  document.body.style.fontFamily = family;
-  document.body.style.fontSize = `${g.fontSize || 14}px`;
-}
-
 function applySettings(s) {
   settings = s || {};
 
@@ -153,7 +55,7 @@ function applySettings(s) {
   sortByDdl = !!ws.sortByDdl;
 
   applyGlobalSettings(settings.global || {});
-  setSurfaceVars(widget, ws, settings.global || {});
+  setSurfaceVars(widget, ws, settings.global || {}, { glassOpacity: .14, blurStrength: 36, cornerRadius: 24 });
   updateSortButton();
   applyTranslations();
 }
@@ -229,7 +131,7 @@ function removeWithParticles(row, id) {
   if (!row || row.classList.contains('particle-removing')) return;
 
   const rect = row.getBoundingClientRect();
-  const count = 18;
+  const count = 300;
 
   row.classList.add('particle-removing');
 
@@ -258,6 +160,45 @@ function removeWithParticles(row, id) {
   }, 520);
 }
 
+function createTodoRow(item) {
+  const row = document.createElement('div');
+  row.className = 'todo no-drag';
+  row.dataset.id = item.id;
+
+  row.innerHTML = `
+    <div class="check" title="done"></div>
+    <div class="content">
+      <div class="content-title"></div>
+      <div class="detail"></div>
+    </div>
+    <div class="ddl"></div>
+  `;
+
+  row.querySelector('.content-title').textContent = item.content;
+  row.querySelector('.detail').textContent = item.detail || '';
+  row.querySelector('.ddl').textContent = item.ddl;
+
+  row.querySelector('.check').onclick = async event => {
+    event.stopPropagation();
+
+    row.classList.add('done-sweep');
+
+    setTimeout(() => {
+      row.classList.add('done-fade');
+
+      setTimeout(() => {
+        window.todoLite.completeTodo(item.id);
+      }, 340);
+    }, 550);
+  };
+
+  row.querySelector('.content').onclick = () => row.classList.toggle('open');
+  row.querySelector('.content').ondblclick = () => openEditor(item);
+  row.oncontextmenu = event => showContextMenu(event, item, row);
+
+  return row;
+}
+
 function render() {
   const active = sortItems(todos.active || []);
 
@@ -265,46 +206,104 @@ function render() {
 
   if (!active.length) {
     list.innerHTML = `<div class="empty">${t('nothingLeft')}</div>`;
+    previousActiveIds = new Set();
     return;
   }
 
   for (const item of active) {
-    const row = document.createElement('div');
-    row.className = 'todo no-drag';
-
-    row.innerHTML = `
-      <div class="check" title="done"></div>
-      <div class="content">
-        <div class="content-title"></div>
-        <div class="detail"></div>
-      </div>
-      <div class="ddl"></div>
-    `;
-
-    row.querySelector('.content-title').textContent = item.content;
-    row.querySelector('.detail').textContent = item.detail || '';
-    row.querySelector('.ddl').textContent = item.ddl;
-
-    row.querySelector('.check').onclick = async event => {
-      event.stopPropagation();
-
-      row.classList.add('done-sweep');
-
-      setTimeout(() => {
-        row.classList.add('done-fade');
-
-        setTimeout(() => {
-          window.todoLite.completeTodo(item.id);
-        }, 340);
-      }, 550);
-    };
-
-    row.querySelector('.content').onclick = () => row.classList.toggle('open');
-    row.querySelector('.content').ondblclick = () => openEditor(item);
-    row.oncontextmenu = event => showContextMenu(event, item, row);
-
-    list.appendChild(row);
+    list.appendChild(createTodoRow(item));
   }
+
+  previousActiveIds = new Set(active.map(i => i.id));
+}
+
+// 流动排序动画：WAAPI 弹簧流动
+function animateSort() {
+  const active = todos.active || [];
+  if (!active.length) {
+    render();
+    return;
+  }
+
+  const sorted = sortItems(active);
+  const rows = [...list.querySelectorAll('.todo')];
+  const existingIds = new Set(rows.map(r => r.dataset.id));
+  const sortedIds = new Set(sorted.map(i => i.id));
+
+  // First: 捕获已有卡片当前位置
+  const firstRects = new Map();
+  for (const row of rows) {
+    firstRects.set(row.dataset.id, row.getBoundingClientRect());
+  }
+
+  // 移除已不在列表中的卡片
+  for (const row of rows) {
+    if (!sortedIds.has(row.dataset.id)) {
+      row.animate([
+        { opacity: 1, transform: 'translateY(0) scale(1)', offset: 0 },
+        { opacity: 0, transform: 'translateY(-8px) scale(0.96)', offset: 1 }
+      ], { duration: 240, easing: 'ease-in', fill: 'forwards' })
+        .onfinish = () => row.remove();
+    }
+  }
+
+  // 新增卡片：插入 DOM
+  const newItems = sorted.filter(item => !existingIds.has(item.id));
+  for (const item of newItems) {
+    list.appendChild(createTodoRow(item));
+  }
+
+  // 重排 DOM 到排序后顺序
+  const fragment = document.createDocumentFragment();
+  for (const item of sorted) {
+    const row = list.querySelector(`.todo[data-id="${item.id}"]`);
+    if (row) fragment.appendChild(row);
+  }
+  list.appendChild(fragment);
+
+  // 获取新位置，WAAPI 流动动画
+  const springEase = 'cubic-bezier(0.34, 1.56, 0.64, 1)';
+  const sortedRows = [...list.querySelectorAll('.todo')];
+
+  sortedRows.forEach((row, index) => {
+    const id = row.dataset.id;
+    const isNew = !firstRects.has(id);
+    const oldRect = firstRects.get(id);
+    const newRect = row.getBoundingClientRect();
+
+    if (isNew) {
+      // 新卡片：从下方弹入
+      row.animate([
+        { opacity: 0, transform: 'translateY(16px) scale(0.96)', filter: 'blur(3px)' },
+        { opacity: 1, transform: 'translateY(0) scale(1)', filter: 'blur(0)' }
+      ], {
+        duration: 360,
+        delay: index * 40,
+        easing: springEase,
+        fill: 'forwards'
+      }).onfinish = () => { row.style.opacity = ''; };
+    } else if (oldRect) {
+      const dy = oldRect.top - newRect.top;
+      const dx = oldRect.left - newRect.left;
+
+      if (Math.abs(dy) < 1 && Math.abs(dx) < 1) return;
+
+      // 弹簧流动：从旧位置弹到新位置，带微小过冲
+      row.animate([
+        { transform: `translate(${dx}px, ${dy}px)` },
+        { transform: `translate(${dx * 0.08}px, ${dy * 0.08}px)` },
+        { transform: 'translate(0, 0)' }
+      ], {
+        duration: 450,
+        delay: index * 40,
+        easing: springEase,
+        fill: 'forwards'
+      }).onfinish = () => { row.style.transform = ''; };
+    }
+  });
+
+  // 更新缓存
+  previousActiveIds = new Set(sorted.map(i => i.id));
 }
 
 function openEditor(item) {
@@ -400,28 +399,6 @@ function updateLiquidSpot(event) {
   widget.style.setProperty('--spot-y', `${y}%`);
 }
 
-function bindGlowLifecycle(surface) {
-  if (!surface) return;
-
-  surface.classList.add('is-idle');
-  surface.classList.remove('is-lit');
-
-  const lightOn = () => {
-    surface.classList.remove('is-idle');
-    surface.classList.add('is-lit');
-  };
-
-  const lightOff = () => {
-    surface.classList.remove('is-lit');
-    surface.classList.add('is-idle');
-  };
-
-  surface.addEventListener('mouseenter', lightOn);
-  surface.addEventListener('pointerenter', lightOn);
-  surface.addEventListener('mouseleave', lightOff);
-  surface.addEventListener('pointerleave', lightOff);
-}
-
 form.onsubmit = async event => {
   event.preventDefault();
 
@@ -468,41 +445,93 @@ sortBtn.onclick = async () => {
   });
 
   applySettings(next);
-  render();
+  animateSort(); // 使用液态排序动画
 };
 
 widget?.addEventListener('pointermove', updateLiquidSpot);
 
+{
+  let dragging = false;
+  let startY = 0;
+  let startScroll = 0;
+
+  function isInteractivePointerTarget(target) {
+    return Boolean(
+      target.closest(
+        '.check, .content, .ddl, button, input, textarea, select, dialog, .task-context-menu'
+      )
+    );
+  }
+
+  list.addEventListener('pointerdown', event => {
+    if (event.button !== 0) return;
+
+    if (isInteractivePointerTarget(event.target)) {
+      dragging = false;
+      return;
+    }
+
+    dragging = true;
+    startY = event.clientY;
+    startScroll = list.scrollTop;
+
+    try {
+      list.setPointerCapture(event.pointerId);
+    } catch {
+      // Ignore capture failures.
+    }
+  });
+
+  list.addEventListener('pointermove', event => {
+    if (!dragging) return;
+
+    event.preventDefault();
+    list.scrollTop = Math.max(0, startScroll - (event.clientY - startY));
+  });
+
+  list.addEventListener('pointerup', event => {
+    dragging = false;
+
+    try {
+      list.releasePointerCapture(event.pointerId);
+    } catch {
+      // Ignore release failures.
+    }
+  });
+
+  list.addEventListener('pointercancel', event => {
+    dragging = false;
+
+    try {
+      list.releasePointerCapture(event.pointerId);
+    } catch {
+      // Ignore release failures.
+    }
+  });
+}
+
+let previousActiveIds = new Set();
+
 window.todoLite.onTodosChanged(data => {
   todos = data;
-  render();
+
+  const newActiveIds = new Set((data.active || []).map(item => item.id));
+  const idsChanged = previousActiveIds.size !== newActiveIds.size ||
+    [...newActiveIds].some(id => !previousActiveIds.has(id));
+
+  const sorted = sortItems(data.active || []);
+  const rows = list.querySelectorAll('.todo');
+  const orderChanged = sorted.some((item, i) => rows[i]?.dataset.id !== item.id);
+
+  if (idsChanged || orderChanged) {
+    animateSort();
+  }
 });
 
 window.todoLite.onSettingsChanged(data => {
   applySettings(data);
-  render();
+  animateSort();
 });
-
-function safeFontName(name) {
-  return String(name || '').replace(/['\\]/g, '');
-}
-
-function injectProjectFonts(list) {
-  if (!list.length) return;
-
-  const old = document.getElementById('projectFontsStyle');
-  if (old) old.remove();
-
-  const style = document.createElement('style');
-  style.id = 'projectFontsStyle';
-
-  style.textContent = list.map(f => {
-    const name = safeFontName(f.name);
-    return `@font-face{font-family:'${name}';src:url('${f.url}');font-display:swap;}`;
-  }).join('\n');
-
-  document.head.appendChild(style);
-}
 
 (async function init() {
   const fontData = await window.todoLite.listFonts();
@@ -513,6 +542,9 @@ function injectProjectFonts(list) {
 
   todos = await window.todoLite.getTodos();
   settings = await window.todoLite.getSettings();
+
+  // 初始化任务 ID 集合
+  previousActiveIds = new Set((todos.active || []).map(item => item.id));
 
   applySettings(settings);
   bindGlowLifecycle(widget);
