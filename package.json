@@ -1,7 +1,7 @@
 {
   "name": "todolite",
   "productName": "TodoLite",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A minimal Windows liquid-glass desktop todo layer.",
   "main": "electron/main.js",
   "scripts": {
