@@ -455,21 +455,59 @@ widget?.addEventListener('pointermove', updateLiquidSpot);
   let startY = 0;
   let startScroll = 0;
 
+  function isInteractivePointerTarget(target) {
+    return Boolean(
+      target.closest(
+        '.check, .content, .ddl, button, input, textarea, select, dialog, .task-context-menu'
+      )
+    );
+  }
+
   list.addEventListener('pointerdown', event => {
     if (event.button !== 0) return;
+
+    if (isInteractivePointerTarget(event.target)) {
+      dragging = false;
+      return;
+    }
+
     dragging = true;
     startY = event.clientY;
     startScroll = list.scrollTop;
-    list.setPointerCapture(event.pointerId);
+
+    try {
+      list.setPointerCapture(event.pointerId);
+    } catch {
+      // Ignore capture failures.
+    }
   });
 
   list.addEventListener('pointermove', event => {
     if (!dragging) return;
+
+    event.preventDefault();
     list.scrollTop = Math.max(0, startScroll - (event.clientY - startY));
   });
 
-  list.addEventListener('pointerup', () => { dragging = false; });
-  list.addEventListener('pointercancel', () => { dragging = false; });
+  list.addEventListener('pointerup', event => {
+    dragging = false;
+
+    try {
+      list.releasePointerCapture(event.pointerId);
+    } catch {
+      // Ignore release failures.
+    }
+  });
+
+  list.addEventListener('pointercancel', event => {
+    dragging = false;
+
+    try {
+      list.releasePointerCapture(event.pointerId);
+    } catch {
+      // Ignore release failures.
+    }
+  });
 }
 
 let previousActiveIds = new Set();
