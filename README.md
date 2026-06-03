@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Author](https://img.shields.io/badge/Author-Gnitimg-orange.svg)](https://github.com/gnitimg)
-[![Release](https://img.shields.io/badge/Release-v0.1.0-green.svg)](https://github.com/gnitimg/TodoLite/releases/download/v0.1.0/TodoLite_installer.exe)
+[![Release](https://img.shields.io/badge/Release-v0.1.2-green.svg)](https://github.com/gnitimg/TodoLite/releases/download/v0.1.2/TodoLite_installer.exe)
 
 A minimal Windows desktop todo layer with iOS 26 liquid-glass aesthetics.
 
